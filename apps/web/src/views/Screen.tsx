@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { ChatComment, Reaction, ReactionKind, Se, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+import { usePoll } from '../lib/usePoll';
 import { sePlayer } from '../lib/sound';
 
 const EMOJI: Record<ReactionKind, string> = {
@@ -23,6 +24,17 @@ export default function Screen() {
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [sePops, setSePops] = useState<SePop[]>([]);
   const [soundOn, setSoundOn] = useState(false);
+  const { poll, counts, total } = usePoll(socket);
+  const [pollVisible, setPollVisible] = useState(false);
+
+  useEffect(() => {
+    if (!poll) return;
+    setPollVisible(true);
+    if (!poll.isOpen) {
+      const timer = setTimeout(() => setPollVisible(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [poll]);
 
   useEffect(() => {
     if (!socket) return;
@@ -104,6 +116,37 @@ export default function Screen() {
           {p.label}
         </div>
       ))}
+
+      {poll && pollVisible && (
+        <div
+          style={{
+            position: 'absolute', right: 24, top: 64, width: 'min(420px, 42vw)',
+            background: 'rgba(0,0,0,0.75)', border: '2px solid #cddc29', borderRadius: 12,
+            padding: '1rem 1.2rem',
+          }}
+        >
+          <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 4 }}>
+            📊 {poll.question}
+          </div>
+          <div style={{ fontSize: '0.85rem', color: '#cddc29', marginBottom: 10 }}>
+            {poll.isOpen ? `投票受付中 ｜ ${total}票` : `締切 ｜ ${total}票`}
+          </div>
+          {poll.options.map((opt, i) => {
+            const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+            return (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem' }}>
+                  <span>{opt}</span>
+                  <span>{pct}%</span>
+                </div>
+                <div style={{ background: '#333', borderRadius: 5, height: 12 }}>
+                  <div style={{ width: `${pct}%`, background: '#cddc29', height: '100%', borderRadius: 5, transition: 'width 0.4s' }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {!soundOn && (
         <button

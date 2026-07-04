@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { ReactionKind, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+import { usePoll } from '../lib/usePoll';
 
 const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
   { kind: 'don', emoji: '🥁', label: 'ドン' },
@@ -22,8 +23,16 @@ const REACTIONS: { kind: ReactionKind; emoji: string; label: string }[] = [
 export default function Audience() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'audience');
+  const { poll, counts, total } = usePoll(socket);
   const [comment, setComment] = useState('');
   const [name, setName] = useState('');
+  const [myVote, setMyVote] = useState<{ pollId: string; index: number } | null>(null);
+
+  const vote = (index: number) => {
+    if (!poll?.isOpen || !socket) return;
+    socket.emit('vote', poll.id, index);
+    setMyVote({ pollId: poll.id, index });
+  };
 
   const sendComment = () => {
     const body = comment.trim();
@@ -40,6 +49,37 @@ export default function Audience() {
           {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
         </span>
       </header>
+
+      {poll && (
+        <section aria-label="アンケート" style={{ margin: '1.5rem 0', padding: '1rem', border: '2px solid #d0342c', borderRadius: 12 }}>
+          <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>
+            📊 {poll.question} {poll.isOpen ? '' : '（締切）'}
+          </h2>
+          {poll.options.map((opt, i) => {
+            const isMine = myVote?.pollId === poll.id && myVote.index === i;
+            const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+            return (
+              <button
+                key={i}
+                onClick={() => vote(i)}
+                disabled={!poll.isOpen}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
+                  padding: '0.6rem 0.8rem', borderRadius: 8, cursor: poll.isOpen ? 'pointer' : 'default',
+                  border: isMine ? '2px solid #d0342c' : '1px solid #ccc',
+                  background: `linear-gradient(90deg, #f2f7c4 ${pct}%, #fff ${pct}%)`,
+                }}
+              >
+                {isMine ? '✅ ' : ''}{opt}
+                <span style={{ float: 'right', color: '#888', fontSize: '0.85rem' }}>{pct}%</span>
+              </button>
+            );
+          })}
+          <p style={{ fontSize: '0.8rem', color: '#888', margin: '4px 0 0' }}>
+            {total}票{poll.isOpen ? '・タップで投票（変更可）' : ''}
+          </p>
+        </section>
+      )}
 
       <section aria-label="リアクション" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '1.5rem 0' }}>
         {REACTIONS.map(({ kind, emoji, label }) => (
