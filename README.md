@@ -1,5 +1,7 @@
 # SparkPlug ⚡
 
+<img src="assets/logo.png" alt="PLUG - Power Platform Local User Group" width="200" align="right" />
+
 **発表者と参加者の間に流れる情報を可視化・拡張・保存する** — コミュニティイベント向けのリアルタイム盛り上げ + 振り返りアプリ。
 
 > Spark plug = 点火プラグ。エンジンをかける。場に火をつける。
