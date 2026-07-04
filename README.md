@@ -56,8 +56,9 @@ npm run dev:web        # http://localhost:5173
 ## Roadmap
 
 - [x] モノレポ雛形（web / server / shared）
-- [ ] リアクション送受信のリアルタイムデモ（ルーム = イベント単位）
-- [ ] コメント流し + SE 再生（Web Audio API）
+- [x] リアクション送受信のリアルタイムデモ（ルーム = イベント単位）
+- [x] コメント流し（参加者 → 会場スクリーン、匿名/記名）
+- [ ] SE 再生（Web Audio API）
 - [ ] 選択式アンケート + リアルタイム集計
 - [ ] Dockerfile + Azure Container Apps デプロイ（Bicep）
 - [ ] Azure Static Web Apps デプロイ + GitHub Actions CD
