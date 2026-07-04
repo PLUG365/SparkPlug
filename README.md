@@ -58,7 +58,7 @@ npm run dev:web        # http://localhost:5173
 - [x] モノレポ雛形（web / server / shared）
 - [x] リアクション送受信のリアルタイムデモ（ルーム = イベント単位）
 - [x] コメント流し（参加者 → 会場スクリーン、匿名/記名）
-- [x] SE 再生（Web Audio API 合成、音声ファイル不要。ドン/カッ/拍手/ドラムロール/ファンファーレ）
+- [x] SE 再生（ドン/カッ/拍手はフリー素材 mp3、ドラムロール/ファンファーレは Web Audio API 合成）
 - [ ] 選択式アンケート + リアルタイム集計
 - [ ] Dockerfile + Azure Container Apps デプロイ（Bicep）
 - [ ] Azure Static Web Apps デプロイ + GitHub Actions CD
@@ -77,6 +77,11 @@ npm run dev:web        # http://localhost:5173
 
 SparkPlug は [PLUG（Power Platform Local User Group）](https://github.com/PLUG365) 発のプロジェクトです。
 
+## クレジット
+
+効果音素材: [OtoLogic](https://otologic.jp/)（CC BY 4.0）
+`apps/web/public/se/` の mp3 は OtoLogic 素材（Percussive_Accent04 / Hyoshigi01 / Applause02）をリネームして使用。
+
 ## License
 
-MIT
+MIT（効果音 mp3 を除く。上記クレジット参照）
