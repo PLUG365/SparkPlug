@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ReactionKind } from '@sparkplug/shared';
+import type { ReactionKind, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+
+const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
+  { kind: 'don', emoji: '🥁', label: 'ドン' },
+  { kind: 'ka', emoji: '🪵', label: 'カッ' },
+  { kind: 'clap', emoji: '👏', label: '拍手' },
+  { kind: 'drumroll', emoji: '🌀', label: 'ドラムロール' },
+  { kind: 'fanfare', emoji: '🎺', label: 'ファンファーレ' },
+];
 
 const REACTIONS: { kind: ReactionKind; emoji: string; label: string }[] = [
   { kind: 'clap', emoji: '👏', label: '拍手' },
@@ -48,6 +56,25 @@ export default function Audience() {
             {emoji}
           </button>
         ))}
+      </section>
+
+      <section aria-label="効果音" style={{ margin: '0 0 1.5rem' }}>
+        <p style={{ fontSize: '0.8rem', color: '#888', margin: '0 0 6px' }}>会場に音を鳴らす 🔊</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {SOUNDS.map(({ kind, emoji, label }) => (
+            <button
+              key={kind}
+              onClick={() => socket?.emit('se', kind)}
+              disabled={!connected}
+              style={{
+                fontSize: '1rem', padding: '0.5rem 0.8rem', borderRadius: 12,
+                border: '2px solid #d0342c', background: '#fff', cursor: 'pointer',
+              }}
+            >
+              {emoji} {label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section aria-label="コメント">

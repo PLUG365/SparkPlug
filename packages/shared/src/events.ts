@@ -12,6 +12,15 @@ export interface Reaction {
   at: number;
 }
 
+/** SE（効果音）の種類。会場スクリーン側で Web Audio API により合成再生される。 */
+export type SeKind = 'don' | 'ka' | 'clap' | 'drumroll' | 'fanfare';
+
+export interface Se {
+  kind: SeKind;
+  eventId: string;
+  at: number;
+}
+
 export interface ChatComment {
   id: string;
   eventId: string;
@@ -31,6 +40,7 @@ export interface ClientToServerEvents {
   join: (payload: JoinPayload) => void;
   reaction: (kind: ReactionKind) => void;
   comment: (body: string, displayName?: string) => void;
+  se: (kind: SeKind) => void;
 }
 
 /** サーバー → クライアント */
@@ -38,5 +48,6 @@ export interface ServerToClientEvents {
   joined: (payload: { eventId: string; participantCount: number }) => void;
   reaction: (reaction: Reaction) => void;
   comment: (comment: ChatComment) => void;
+  se: (se: Se) => void;
   participantCount: (count: number) => void;
 }
