@@ -1,24 +1,63 @@
 import type { SeKind } from '@sparkplug/shared';
 
 /**
- * SE をすべて Web Audio API で合成再生するプレイヤー。音声ファイル不要。
+ * ファイル素材がある SE。無いものは Web Audio API 合成にフォールバックする。
+ * mp3 は OtoLogic (https://otologic.jp/) の CC BY 4.0 素材。クレジットは README 参照。
+ */
+const SE_FILES: Partial<Record<SeKind, string>> = {
+  don: '/se/don.mp3',
+  ka: '/se/ka.mp3',
+  clap: '/se/clap.mp3',
+};
+
+/**
+ * SE プレイヤー。public/se/ にファイルがある音はそれを再生し、
+ * 無い音（drumroll / fanfare）は Web Audio API で合成する。
  * ブラウザの自動再生制限のため、ユーザー操作を起点に enable() を呼ぶこと。
  */
 export class SePlayer {
   private ctx: AudioContext | null = null;
+  private buffers = new Map<SeKind, AudioBuffer>();
 
   enable(): void {
     this.ctx ??= new AudioContext();
     void this.ctx.resume();
+    void this.preload();
   }
 
   get enabled(): boolean {
     return this.ctx?.state === 'running';
   }
 
+  private async preload(): Promise<void> {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    await Promise.all(
+      (Object.entries(SE_FILES) as [SeKind, string][]).map(async ([kind, url]) => {
+        if (this.buffers.has(kind)) return;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return;
+          const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+          this.buffers.set(kind, buf);
+        } catch {
+          // 取得失敗時は合成フォールバックに任せる
+        }
+      }),
+    );
+  }
+
   play(kind: SeKind): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
+    const buffer = this.buffers.get(kind);
+    if (buffer) {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(ctx.destination);
+      src.start();
+      return;
+    }
     const t = ctx.currentTime;
     switch (kind) {
       case 'don': this.don(ctx, t); break;
