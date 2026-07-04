@@ -58,7 +58,7 @@ npm run dev:web        # http://localhost:5173
 - [x] モノレポ雛形（web / server / shared）
 - [x] リアクション送受信のリアルタイムデモ（ルーム = イベント単位）
 - [x] コメント流し（参加者 → 会場スクリーン、匿名/記名）
-- [ ] SE 再生（Web Audio API）
+- [x] SE 再生（Web Audio API 合成、音声ファイル不要。ドン/カッ/拍手/ドラムロール/ファンファーレ）
 - [ ] 選択式アンケート + リアルタイム集計
 - [ ] Dockerfile + Azure Container Apps デプロイ（Bicep）
 - [ ] Azure Static Web Apps デプロイ + GitHub Actions CD

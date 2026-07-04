@@ -25,8 +25,11 @@ function roomOf(eventId: string): string {
   return `event:${eventId}`;
 }
 
+const SE_THROTTLE_MS = 400;
+
 io.on('connection', (socket) => {
   let joinedEventId: string | undefined;
+  let lastSeAt = 0;
 
   socket.on('join', async ({ eventId, role }: JoinPayload) => {
     joinedEventId = eventId;
@@ -56,6 +59,18 @@ io.on('connection', (socket) => {
       body: trimmed,
       displayName,
       at: Date.now(),
+    });
+  });
+
+  socket.on('se', (kind) => {
+    if (!joinedEventId) return;
+    const now = Date.now();
+    if (now - lastSeAt < SE_THROTTLE_MS) return;
+    lastSeAt = now;
+    io.to(roomOf(joinedEventId)).emit('se', {
+      kind,
+      eventId: joinedEventId,
+      at: now,
     });
   });
 
