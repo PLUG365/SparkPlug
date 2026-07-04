@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+  <title>SparkPlug logo</title>
+  <desc>赤いコンセントプラグのプロングから稲妻が飛び出し、場に点火する瞬間</desc>
+  <style>
+    .ink { stroke: #1a1a1a; }
+    .ink-fill { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e8e8e8; }
+      .ink-fill { fill: #e8e8e8; }
+    }
+  </style>
+  <path d="M256 150 C 256 90, 200 95, 200 46" fill="none" class="ink" stroke-width="14" stroke-linecap="round"/>
+  <rect x="174" y="142" width="164" height="160" rx="38" fill="#d0342c"/>
+  <rect x="214" y="300" width="24" height="46" rx="7" fill="#f5c400"/>
+  <rect x="274" y="300" width="24" height="46" rx="7" fill="#f5c400"/>
+  <polygon points="282,352 238,420 262,420 248,470 300,398 274,398" fill="#cddc29" class="ink" stroke-width="5" stroke-linejoin="round"/>
+  <g stroke="#f5a300" stroke-width="9" stroke-linecap="round">
+    <line x1="196" y1="362" x2="182" y2="381"/>
+    <line x1="330" y1="362" x2="344" y2="381"/>
+  </g>
+</svg>

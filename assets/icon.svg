@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img">
+  <title>SparkPlug app icon</title>
+  <desc>黒い角丸タイルに黄緑の稲妻と赤い火花</desc>
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#1a1a1a"/>
+  <polygon points="322,66 139,293 227,293 176,447 373,198 278,198" fill="#cddc29"/>
+  <circle cx="402" cy="95" r="18" fill="#d0342c"/>
+</svg>
