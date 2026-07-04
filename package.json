@@ -1,0 +1,16 @@
+{
+  "name": "sparkplug",
+  "private": true,
+  "version": "0.0.1",
+  "description": "SparkPlug — コミュニティイベントをリアルタイムに盛り上げ、拾い上げ、振り返るアプリ",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:server": "npm run dev -w apps/server",
+    "dev:web": "npm run dev -w apps/web"
+  }
+}
