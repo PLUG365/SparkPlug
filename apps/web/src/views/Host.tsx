@@ -1,12 +1,107 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useEvent } from '../lib/useEvent';
+import { usePoll } from '../lib/usePoll';
+
+const MAX_OPTIONS = 6;
 
 export default function Host() {
   const { eventId } = useParams();
+  const { socket, connected, participantCount } = useEvent(eventId, 'host');
+  const { poll, counts, total } = usePoll(socket);
+  const [question, setQuestion] = useState('');
+  const [options, setOptions] = useState<string[]>(['', '']);
+
+  const filled = options.map((o) => o.trim()).filter(Boolean);
+  const canCreate = connected && question.trim() && filled.length >= 2;
+
+  const createPoll = () => {
+    if (!canCreate || !socket) return;
+    socket.emit('createPoll', question.trim(), filled);
+    setQuestion('');
+    setOptions(['', '']);
+  };
+
   return (
-    <main style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
-      <h1>🎛️ 主催者ホスト画面</h1>
-      <p>イベント: {eventId}</p>
-      <p>TODO: アンケート仕込み / 演出コントロール / ダッシュボード / モデレーション</p>
+    <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h1 style={{ fontSize: '1.4rem' }}>🎛️ ホスト｜{eventId}</h1>
+        <span style={{ fontSize: '0.9rem', color: '#666' }}>
+          {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
+        </span>
+      </header>
+
+      <section aria-label="アンケート作成" style={{ margin: '1.5rem 0', padding: '1rem', border: '2px solid #cddc29', borderRadius: 12 }}>
+        <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>📊 アンケートを作る</h2>
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="設問（例: 今日の内容、試したことある？）"
+          maxLength={100}
+          style={{ width: '100%', padding: '0.6rem', marginBottom: 8, boxSizing: 'border-box' }}
+        />
+        {options.map((opt, i) => (
+          <input
+            key={i}
+            value={opt}
+            onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))}
+            placeholder={`選択肢 ${i + 1}`}
+            maxLength={50}
+            style={{ width: '100%', padding: '0.5rem', marginBottom: 6, boxSizing: 'border-box' }}
+          />
+        ))}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {options.length < MAX_OPTIONS && (
+            <button onClick={() => setOptions([...options, ''])} style={{ padding: '0.4rem 0.8rem' }}>
+              ＋選択肢を追加
+            </button>
+          )}
+          <button
+            onClick={createPoll}
+            disabled={!canCreate}
+            style={{
+              padding: '0.4rem 1.2rem', borderRadius: 8, border: 'none', fontWeight: 600,
+              background: canCreate ? '#d0342c' : '#ccc', color: '#fff',
+              cursor: canCreate ? 'pointer' : 'default',
+            }}
+          >
+            開始
+          </button>
+        </div>
+        {poll?.isOpen && (
+          <p style={{ fontSize: '0.8rem', color: '#888' }}>※開始すると実施中のアンケートは自動で締め切られます</p>
+        )}
+      </section>
+
+      {poll && (
+        <section aria-label="集計" style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <h2 style={{ fontSize: '1.1rem', margin: 0 }}>
+              {poll.isOpen ? '🔴 実施中' : '⏹ 締切'}: {poll.question}
+            </h2>
+            {poll.isOpen && (
+              <button onClick={() => socket?.emit('closePoll')} style={{ padding: '0.3rem 0.8rem' }}>
+                締め切る
+              </button>
+            )}
+          </div>
+          <p style={{ color: '#666', fontSize: '0.9rem' }}>{total}票</p>
+          {poll.options.map((opt, i) => {
+            const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+            return (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
+                  <span>{opt}</span>
+                  <span>{counts[i] ?? 0}票 ({pct}%)</span>
+                </div>
+                <div style={{ background: '#eee', borderRadius: 6, height: 14 }}>
+                  <div style={{ width: `${pct}%`, background: '#cddc29', height: '100%', borderRadius: 6, transition: 'width 0.3s' }} />
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
     </main>
   );
 }
