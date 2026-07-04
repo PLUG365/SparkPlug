@@ -1,6 +1,8 @@
 # SparkPlug ⚡
 
-<img src="assets/logo.png" alt="PLUG - Power Platform Local User Group" width="200" align="right" />
+<img src="assets/logo.svg" alt="SparkPlug logo" width="160" align="right" />
+
+<img src="assets/wordmark.svg" alt="SparkPlug" width="300" />
 
 **発表者と参加者の間に流れる情報を可視化・拡張・保存する** — コミュニティイベント向けのリアルタイム盛り上げ + 振り返りアプリ。
 
@@ -62,6 +64,17 @@ npm run dev:web        # http://localhost:5173
 - [ ] イベントログ永続化（Cosmos DB）+ CSV エクスポート
 - [ ] 発表者ビュー（エモメーター・バックチャンネル・質問トリアージ）
 - [ ] AI 振り返り分析
+
+## ブランドアセット
+
+| ファイル | 用途 |
+|---|---|
+| `assets/logo.svg` | メインロゴ（点火するプラグ） |
+| `assets/icon.svg` + `icon-192/512.png` | PWA・ファビコン用アイコン |
+| `assets/wordmark.svg` | サイトヘッダー・ドキュメント用ワードマーク |
+| `assets/plug-community-logo.png` | PLUG コミュニティ本体のロゴ |
+
+SparkPlug は [PLUG（Power Platform Local User Group）](https://github.com/PLUG365) 発のプロジェクトです。
 
 ## License
 

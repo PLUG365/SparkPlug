@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 100" role="img">
+  <title>SparkPlug wordmark</title>
+  <desc>Spark（黒）とPlug（赤）の間に火花</desc>
+  <style>
+    .ink-fill { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      .ink-fill { fill: #f0f0f0; }
+    }
+    text { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-weight: 600; font-size: 58px; }
+  </style>
+  <text x="196" y="70" text-anchor="end" class="ink-fill">Spark</text>
+  <polygon points="222,18 198,56 215,56 205,84 236,42 217,42" fill="#f5a300"/>
+  <text x="244" y="70" text-anchor="start" fill="#d0342c">Plug</text>
+</svg>
