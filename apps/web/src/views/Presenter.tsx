@@ -9,22 +9,25 @@ const METER_WINDOW_SEC = 60;
 const BUCKET_SEC = 1;
 const BUCKET_COUNT = METER_WINDOW_SEC / BUCKET_SEC; // 60
 
-/** 面グラフの縦スケール下限（件/秒）。これ未満の山は上端（赤）に届かない */
+/** 面グラフの縦スケール下限（pt/秒）。これ未満の山は上端（赤）に届かない */
 const METER_SCALE_MIN = 8;
+
+/** 熱量ポイントの重み。コメントは書く手間が大きい分、高配点 */
+const WEIGHTS = { reaction: 1, se: 2, comment: 3, question: 3 } as const;
 
 /** 「熱量」判定に使う直近窓（秒） */
 const HEAT_WINDOW_SEC = 10;
-/** 熱量の段階しきい値（直近 HEAT_WINDOW_SEC 秒のリアクション数）。上から順に判定 */
+/** 熱量の段階しきい値（直近 HEAT_WINDOW_SEC 秒の合計ポイント）。上から順に判定 */
 const HEAT_LEVELS: { min: number; emoji: string; label: string }[] = [
-  { min: 15, emoji: '🌋', label: '大噴火' },
-  { min: 5, emoji: '🔥', label: 'アツい' },
+  { min: 24, emoji: '🌋', label: '大噴火' },
+  { min: 8, emoji: '🔥', label: 'アツい' },
   { min: 1, emoji: '🙂', label: 'ぼちぼち' },
   { min: 0, emoji: '😴', label: '静か' },
 ];
 
-/** バイブレーション: 直近 VIBRATE_WINDOW_SEC 秒で VIBRATE_THRESHOLD 件超えたら振動 */
+/** バイブレーション: 直近 VIBRATE_WINDOW_SEC 秒で VIBRATE_THRESHOLD pt 超えたら振動 */
 const VIBRATE_WINDOW_SEC = 5;
-const VIBRATE_THRESHOLD = 5;
+const VIBRATE_THRESHOLD = 10;
 const VIBRATE_MS = 200;
 /** 連続発火を防ぐクールダウン（ms） */
 const VIBRATE_COOLDOWN_MS = 10_000;
@@ -39,23 +42,29 @@ function hhmm(at: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** 直近 sec 秒に含まれるタイムスタンプ数を数える */
-function countWithin(times: number[], now: number, sec: number): number {
+/** 熱量ポイントの1イベント（受信時刻と重み） */
+interface HeatEvent {
+  at: number;
+  w: number;
+}
+
+/** 直近 sec 秒のポイント合計 */
+function pointsWithin(events: HeatEvent[], now: number, sec: number): number {
   const from = now - sec * 1000;
-  let n = 0;
-  for (let i = times.length - 1; i >= 0; i--) {
-    if (times[i] >= from) n++;
+  let sum = 0;
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].at >= from) sum += events[i].w;
     else break; // 昇順前提。古いものに達したら打ち切り
   }
-  return n;
+  return sum;
 }
 
 export default function Presenter() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'presenter');
 
-  // リアクションの受信時刻を貯める（描画は別途 1 秒ごとに再計算）
-  const reactionTimesRef = useRef<number[]>([]);
+  // 熱量イベント（リアクション/SE/コメント/質問）を重み付きで貯める（描画は別途 1 秒ごとに再計算）
+  const heatEventsRef = useRef<HeatEvent[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
   const lastVibrateRef = useRef(0);
@@ -65,18 +74,24 @@ export default function Presenter() {
   // ── socket 購読 ──────────────────────────────────────────────
   useEffect(() => {
     if (!socket) return;
-    const onReaction = () => {
-      reactionTimesRef.current.push(Date.now());
+    const addHeat = (w: number) => heatEventsRef.current.push({ at: Date.now(), w });
+    const onReaction = () => addHeat(WEIGHTS.reaction);
+    const onSe = () => addHeat(WEIGHTS.se);
+    const onComment = () => {
+      setCommentCount((c) => c + 1);
+      addHeat(WEIGHTS.comment);
     };
-    const onComment = () => setCommentCount((c) => c + 1);
     const onQuestion = (question: Question) => {
       setQuestions((prev) => [question, ...prev].slice(0, QUESTION_LIMIT));
+      addHeat(WEIGHTS.question);
     };
     socket.on('reaction', onReaction);
+    socket.on('se', onSe);
     socket.on('comment', onComment);
     socket.on('question', onQuestion);
     return () => {
       socket.off('reaction', onReaction);
+      socket.off('se', onSe);
       socket.off('comment', onComment);
       socket.off('question', onQuestion);
     };
@@ -86,15 +101,15 @@ export default function Presenter() {
   useEffect(() => {
     const timer = setInterval(() => {
       const now = Date.now();
-      // 窓の外に出た古い時刻を捨てる（配列が無限に伸びないように）
+      // 窓の外に出た古いイベントを捨てる（配列が無限に伸びないように）
       const cutoff = now - METER_WINDOW_SEC * 1000;
-      const times = reactionTimesRef.current;
+      const events = heatEventsRef.current;
       let drop = 0;
-      while (drop < times.length && times[drop] < cutoff) drop++;
-      if (drop > 0) times.splice(0, drop);
+      while (drop < events.length && events[drop].at < cutoff) drop++;
+      if (drop > 0) events.splice(0, drop);
 
       // バイブレーション判定（クールダウン付き・非対応環境では何もしない）
-      const recent = countWithin(times, now, VIBRATE_WINDOW_SEC);
+      const recent = pointsWithin(events, now, VIBRATE_WINDOW_SEC);
       if (
         recent > VIBRATE_THRESHOLD &&
         now - lastVibrateRef.current >= VIBRATE_COOLDOWN_MS
@@ -110,16 +125,16 @@ export default function Presenter() {
 
   // ── 描画用の集計（毎レンダー計算・軽いので問題なし） ───────────
   const now = Date.now();
-  const times = reactionTimesRef.current;
+  const events = heatEventsRef.current;
 
-  // 1 秒バケット 60 本。index 0 が最古、末尾が現在
+  // 1 秒バケット 60 本のポイント合計。index 0 が最古、末尾が現在
   const buckets = new Array<number>(BUCKET_COUNT).fill(0);
-  for (const t of times) {
-    const ageSec = (now - t) / 1000;
+  for (const e of events) {
+    const ageSec = (now - e.at) / 1000;
     if (ageSec < 0 || ageSec >= METER_WINDOW_SEC) continue;
     // 新しいものほど右へ
     const idx = BUCKET_COUNT - 1 - Math.floor(ageSec / BUCKET_SEC);
-    if (idx >= 0 && idx < BUCKET_COUNT) buckets[idx]++;
+    if (idx >= 0 && idx < BUCKET_COUNT) buckets[idx] += e.w;
   }
   // 面グラフの縦スケール。静かなときに小さな山が真っ赤に見えないよう下限を設ける
   const scaleMax = Math.max(...buckets, METER_SCALE_MIN);
@@ -127,8 +142,8 @@ export default function Presenter() {
   const points = buckets.map((v, i) => `${i + 0.5},${100 - (v / scaleMax) * 100}`);
   const areaPath = `M0,100 L${points.join(' L')} L${BUCKET_COUNT},100 Z`;
 
-  // 熱量段階
-  const heatCount = countWithin(times, now, HEAT_WINDOW_SEC);
+  // 熱量段階（重み付きポイント）
+  const heatCount = pointsWithin(events, now, HEAT_WINDOW_SEC);
   const heat = HEAT_LEVELS.find((l) => heatCount >= l.min) ?? HEAT_LEVELS[HEAT_LEVELS.length - 1];
 
   return (
@@ -159,7 +174,7 @@ export default function Presenter() {
           <div>
             <div style={{ fontWeight: 600 }}>{heat.label}</div>
             <div style={{ fontSize: '0.8rem', color: '#888' }}>
-              直近{HEAT_WINDOW_SEC}秒で {heatCount} リアクション
+              直近{HEAT_WINDOW_SEC}秒で {heatCount}pt（コメント{WEIGHTS.comment} / SE{WEIGHTS.se} / リアクション{WEIGHTS.reaction}）
             </div>
           </div>
         </div>
