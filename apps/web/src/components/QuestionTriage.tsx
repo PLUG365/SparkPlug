@@ -6,6 +6,7 @@ const SECTIONS: { status: QuestionStatus; label: string }[] = [
   { status: 'now', label: '🎤 今答える' },
   { status: 'later', label: '⏳ 後で' },
   { status: 'offline', label: '📮 後日' },
+  { status: 'done', label: '✅ 回答済み' },
 ];
 
 /** ステータス変更ボタンのラベル（今のステータス以外を出す） */
@@ -13,6 +14,7 @@ const STATUS_BUTTONS: { status: QuestionStatus; label: string }[] = [
   { status: 'now', label: '🎤 今答える' },
   { status: 'later', label: '⏳ 後で' },
   { status: 'offline', label: '📮 後日' },
+  { status: 'done', label: '✅ 答えた' },
 ];
 
 /** epoch ms を HH:MM に整形（表示用・ローカルTZ） */
@@ -55,21 +57,36 @@ export default function QuestionTriage({ questions, onTriage }: QuestionTriagePr
                     key={q.id}
                     style={{
                       padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
-                      background: '#fafafa',
+                      // 回答済みは薄いグレー背景で控えめに
+                      background: status === 'done' ? '#f2f2f2' : '#fafafa',
                       // 新着セクションは黄色ボーダーで強調
                       border: status === 'new' ? '2px solid #f5c400' : '1px solid #eee',
                     }}
                   >
-                    <div style={{ marginBottom: 6 }}>
+                    <div
+                      style={{
+                        marginBottom: 6,
+                        // 回答済みは文字色をグレー寄せにして「済んだ」感を出す
+                        color: status === 'done' ? '#999' : undefined,
+                      }}
+                    >
                       <span style={{ fontSize: '0.75rem', color: '#aaa', marginRight: 8 }}>
                         {hhmm(q.at)}
                       </span>
-                      <span style={{ color: '#d0342c', fontWeight: 600, marginRight: 8 }}>
+                      <span
+                        style={{
+                          color: status === 'done' ? '#999' : '#d0342c',
+                          fontWeight: 600, marginRight: 8,
+                        }}
+                      >
                         {q.displayName}
                       </span>
                       <span style={{ fontSize: '0.8rem', color: '#888' }}>👍 {q.likes}</span>
                       <br />
-                      {q.body}
+                      {/* 回答済みは本文に打ち消し線 */}
+                      <span style={{ textDecoration: status === 'done' ? 'line-through' : undefined }}>
+                        {q.body}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {STATUS_BUTTONS.filter((b) => b.status !== q.status).map((b) => (

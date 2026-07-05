@@ -143,6 +143,7 @@ const TRIAGE_LOG_LABEL: Record<QuestionStatus, string> = {
   now: '今答える',
   later: '後で',
   offline: '後日',
+  done: '回答済み',
 };
 
 function countsOf(active: ActivePoll): number[] {
@@ -327,7 +328,7 @@ io.on('connection', (socket) => {
   socket.on('triageQuestion', (questionId, status) => {
     // presenter / host のみ振り分け可
     if (!joinedEventId || (joinedRole !== 'presenter' && joinedRole !== 'host')) return;
-    if (status !== 'new' && status !== 'now' && status !== 'later' && status !== 'offline') return;
+    if (status !== 'new' && status !== 'now' && status !== 'later' && status !== 'offline' && status !== 'done') return;
     const records = eventQuestions.get(joinedEventId);
     const record = records?.find((r) => r.question.id === questionId);
     if (!record) return;
