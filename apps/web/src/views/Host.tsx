@@ -61,7 +61,8 @@ export default function Host() {
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="設問（例: 今日の内容、試したことある？）"
           maxLength={100}
-          style={{ width: '100%', padding: '0.6rem', marginBottom: 8, boxSizing: 'border-box' }}
+          // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
+          style={{ width: '100%', padding: '0.6rem', marginBottom: 8, boxSizing: 'border-box', fontSize: 16 }}
         />
         {options.map((opt, i) => (
           <input
@@ -70,7 +71,7 @@ export default function Host() {
             onChange={(e) => setOptions(options.map((o, j) => (j === i ? e.target.value : o)))}
             placeholder={`選択肢 ${i + 1}`}
             maxLength={50}
-            style={{ width: '100%', padding: '0.5rem', marginBottom: 6, boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '0.5rem', marginBottom: 6, boxSizing: 'border-box', fontSize: 16 }}
           />
         ))}
         <div style={{ display: 'flex', gap: 8 }}>
