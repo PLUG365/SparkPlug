@@ -9,6 +9,9 @@ const METER_WINDOW_SEC = 60;
 const BUCKET_SEC = 1;
 const BUCKET_COUNT = METER_WINDOW_SEC / BUCKET_SEC; // 60
 
+/** 面グラフの縦スケール下限（件/秒）。これ未満の山は上端（赤）に届かない */
+const METER_SCALE_MIN = 8;
+
 /** 「熱量」判定に使う直近窓（秒） */
 const HEAT_WINDOW_SEC = 10;
 /** 熱量の段階しきい値（直近 HEAT_WINDOW_SEC 秒のリアクション数）。上から順に判定 */
@@ -109,7 +112,7 @@ export default function Presenter() {
   const now = Date.now();
   const times = reactionTimesRef.current;
 
-  // 5 秒バケット 12 本。index 0 が最古、末尾が現在
+  // 1 秒バケット 60 本。index 0 が最古、末尾が現在
   const buckets = new Array<number>(BUCKET_COUNT).fill(0);
   for (const t of times) {
     const ageSec = (now - t) / 1000;
@@ -118,7 +121,11 @@ export default function Presenter() {
     const idx = BUCKET_COUNT - 1 - Math.floor(ageSec / BUCKET_SEC);
     if (idx >= 0 && idx < BUCKET_COUNT) buckets[idx]++;
   }
-  const maxBucket = Math.max(1, ...buckets);
+  // 面グラフの縦スケール。静かなときに小さな山が真っ赤に見えないよう下限を設ける
+  const scaleMax = Math.max(...buckets, METER_SCALE_MIN);
+  // 面グラフのパス（viewBox: 0..BUCKET_COUNT × 0..100、下端が 100）
+  const points = buckets.map((v, i) => `${i + 0.5},${100 - (v / scaleMax) * 100}`);
+  const areaPath = `M0,100 L${points.join(' L')} L${BUCKET_COUNT},100 Z`;
 
   // 熱量段階
   const heatCount = countWithin(times, now, HEAT_WINDOW_SEC);
@@ -157,28 +164,24 @@ export default function Presenter() {
           </div>
         </div>
 
-        {/* 5 秒バケット 12 本の棒グラフ（右端が現在） */}
-        <div
-          style={{
-            display: 'flex', alignItems: 'flex-end', gap: 1, height: 80,
-            padding: '0 2px', borderBottom: '1px solid #eee',
-          }}
+        {/* 面グラフ（右端が現在）。塗りはリアクション量の縦グラデーション: 静=黄緑 → 熱=赤 */}
+        <svg
+          width="100%"
+          height={80}
+          viewBox={`0 0 ${BUCKET_COUNT} 100`}
+          preserveAspectRatio="none"
+          style={{ display: 'block', borderBottom: '1px solid #eee' }}
+          aria-label="リアクション量の波形"
         >
-          {buckets.map((v, i) => (
-            <div
-              key={i}
-              title={`${v} 件`}
-              style={{
-                flex: 1,
-                height: `${Math.round((v / maxBucket) * 100)}%`,
-                minHeight: v > 0 ? 3 : 0,
-                background: i === BUCKET_COUNT - 1 ? '#d0342c' : '#cddc29',
-                borderRadius: '1px 1px 0 0',
-                transition: 'height 0.3s ease',
-              }}
-            />
-          ))}
-        </div>
+          <defs>
+            <linearGradient id="emoGradient" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="#cddc29" />
+              <stop offset="55%" stopColor="#f5c400" />
+              <stop offset="100%" stopColor="#d0342c" />
+            </linearGradient>
+          </defs>
+          <path d={areaPath} fill="url(#emoGradient)" />
+        </svg>
         <p style={{ fontSize: '0.75rem', color: '#aaa', margin: '4px 0 0', textAlign: 'right' }}>
           直近{METER_WINDOW_SEC}秒（{BUCKET_SEC}秒ごと）→ 現在
         </p>
