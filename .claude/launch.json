@@ -10,7 +10,7 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "-w", "apps/web"],
+      "runtimeArgs": ["run", "dev", "-w", "apps/web", "--", "--host"],
       "port": 5173
     }
   ]
