@@ -27,6 +27,8 @@ export interface ChatComment {
   body: string;
   /** 匿名可。表示名を選んだ場合のみ入る */
   displayName?: string;
+  /** true なら AA として描画する。等幅フォント・改行保持で表示 */
+  isAsciiArt?: boolean;
   at: number;
 }
 
@@ -75,7 +77,7 @@ export interface JoinPayload {
 export interface ClientToServerEvents {
   join: (payload: JoinPayload) => void;
   reaction: (kind: ReactionKind) => void;
-  comment: (body: string, displayName?: string) => void;
+  comment: (body: string, displayName?: string, isAsciiArt?: boolean) => void;
   /** 発表者に届く質問。表示名は必須 */
   question: (body: string, displayName: string) => void;
   /** 質問へのいいね。1接続1票のトグル */
