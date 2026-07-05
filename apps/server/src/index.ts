@@ -13,7 +13,9 @@ import type {
 } from '@sparkplug/shared';
 
 const PORT = Number(process.env.PORT ?? 3001);
-const CORS_ORIGIN = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+// CORS_ORIGIN 未指定なら true（リクエスト元 origin を反射して許可）。
+// dev で LAN 実機（スマホ）テストするための緩和。本番デプロイ時は CORS_ORIGIN を必ず明示すること。
+const CORS_ORIGIN: string | boolean = process.env.CORS_ORIGIN ?? true;
 
 const app = express();
 app.get('/health', (_req, res) => {
