@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
-import { usePoll } from '../lib/usePoll';
+import { usePollList } from '../lib/usePollList';
 import { useQuestions } from '../lib/useQuestions';
 import QuestionTriage from '../components/QuestionTriage';
 import { SERVER_URL } from '../lib/socket';
@@ -13,7 +13,7 @@ const MAX_OPTIONS = 6;
 export default function Host() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'host');
-  const { poll, counts, total } = usePoll(socket);
+  const { polls, resultsByPollId } = usePollList(socket);
   const questions = useQuestions(socket);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
@@ -31,6 +31,11 @@ export default function Host() {
     setQuestion('');
     setOptions(['', '']);
   };
+
+  // 3グループに仕分け。実施中は最優先、下書きは作成順、締切済みは新しい順に
+  const openPoll = polls.find((p) => p.status === 'open');
+  const draftPolls = polls.filter((p) => p.status === 'draft');
+  const closedPolls = polls.filter((p) => p.status === 'closed').sort((a, b) => b.at - a.at);
 
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
@@ -86,41 +91,108 @@ export default function Host() {
             disabled={!canCreate}
             style={pillButtonStyle({ disabled: !canCreate })}
           >
-            開始
+            ＋ 下書きに追加
           </button>
         </div>
-        {poll?.isOpen && (
-          <p style={{ fontSize: '0.8rem', color: '#888' }}>※開始すると実施中のアンケートは自動で締め切られます</p>
-        )}
+        <p style={{ fontSize: '0.8rem', color: '#888' }}>※作成した下書きは、下の一覧から「▶ 開始」で好きなタイミングで始められます</p>
       </section>
 
-      {poll && (
-        <section aria-label="集計" style={{ padding: '1rem', border: '2px solid #ddd', borderRadius: 18 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <h2 style={{ fontSize: '1.1rem', margin: 0 }}>
-              {poll.isOpen ? '🔴 実施中' : '⏹ 締切'}: {poll.question}
-            </h2>
-            {poll.isOpen && (
-              <button onClick={() => socket?.emit('closePoll')} style={{ padding: '0.3rem 0.8rem' }}>
-                締め切る
-              </button>
-            )}
-          </div>
-          <p style={{ color: '#666', fontSize: '0.9rem' }}>{total}票</p>
-          {poll.options.map((opt, i) => {
-            const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+      {/* ── アンケート一覧（実施中 → 下書き → 締切済みの順） ───────── */}
+      {(openPoll || draftPolls.length > 0 || closedPolls.length > 0) && (
+        <section aria-label="アンケート一覧" style={{ margin: '0 0 1.5rem' }}>
+          {/* 実施中：目立たせて最優先表示・ライブ集計・締め切るボタン */}
+          {openPoll && (() => {
+            const result = resultsByPollId[openPoll.id];
+            const counts = result?.counts ?? openPoll.options.map(() => 0);
+            const total = result?.total ?? 0;
             return (
-              <div key={i} style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
-                  <span>{opt}</span>
-                  <span>{counts[i] ?? 0}票 ({pct}%)</span>
+              <div style={{ marginBottom: 12, padding: '1rem', border: `3px solid ${BRAND.red}`, borderRadius: 18, background: '#fff7f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <h2 style={{ fontSize: '1.1rem', margin: 0 }}>🔴 実施中：{openPoll.question}</h2>
+                  <button
+                    onClick={() => socket?.emit('closePoll', openPoll.id)}
+                    style={pillButtonStyle({ color: BRAND.black })}
+                  >
+                    ⏹ 締め切る
+                  </button>
                 </div>
-                <div style={{ background: '#eee', borderRadius: 999, height: 18 }}>
-                  <div style={{ width: `${pct}%`, background: BRAND.lime, height: '100%', borderRadius: 999, transition: 'width 0.3s' }} />
-                </div>
+                <p style={{ color: '#666', fontSize: '0.9rem', margin: '4px 0 8px' }}>{total}票</p>
+                {openPoll.options.map((opt, i) => {
+                  const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+                  return (
+                    <div key={i} style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem' }}>
+                        <span>{opt}</span>
+                        <span>{counts[i] ?? 0}票 ({pct}%)</span>
+                      </div>
+                      <div style={{ background: '#eee', borderRadius: 999, height: 18 }}>
+                        <div style={{ width: `${pct}%`, background: BRAND.red, height: '100%', borderRadius: 999, transition: 'width 0.3s' }} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
-          })}
+          })()}
+
+          {/* 下書き：設問+選択肢プレビューと開始ボタン（複数件あり得る） */}
+          {draftPolls.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <h3 style={{ fontSize: '0.95rem', color: '#666', margin: '0 0 8px' }}>📝 下書き（{draftPolls.length}）</h3>
+              {draftPolls.map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+                    padding: '0.7rem 0.9rem', marginBottom: 8, borderRadius: 14, border: `2px solid ${BRAND.lime}`,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.98rem' }}>{p.question}</div>
+                    <div style={{ fontSize: '0.82rem', color: '#888', marginTop: 2 }}>{p.options.join(' / ')}</div>
+                  </div>
+                  <button
+                    onClick={() => socket?.emit('startPoll', p.id)}
+                    style={pillButtonStyle({ color: BRAND.lime })}
+                  >
+                    ▶ 開始
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 締切済み：最終集計を控えめな配色で表示（操作ボタンなし） */}
+          {closedPolls.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '0.95rem', color: '#999', margin: '0 0 8px' }}>⏹ 締切済み（{closedPolls.length}）</h3>
+              {closedPolls.map((p) => {
+                const result = resultsByPollId[p.id];
+                const counts = result?.counts ?? p.options.map(() => 0);
+                const total = result?.total ?? 0;
+                return (
+                  <div key={p.id} style={{ padding: '0.8rem 0.9rem', marginBottom: 8, borderRadius: 14, border: '2px solid #eee', background: '#fafafa' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#666' }}>{p.question}</div>
+                    <p style={{ color: '#999', fontSize: '0.85rem', margin: '2px 0 8px' }}>{total}票</p>
+                    {p.options.map((opt, i) => {
+                      const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
+                      return (
+                        <div key={i} style={{ marginBottom: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#777' }}>
+                            <span>{opt}</span>
+                            <span>{counts[i] ?? 0}票 ({pct}%)</span>
+                          </div>
+                          <div style={{ background: '#eee', borderRadius: 999, height: 12 }}>
+                            <div style={{ width: `${pct}%`, background: '#bbb', height: '100%', borderRadius: 999 }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
 

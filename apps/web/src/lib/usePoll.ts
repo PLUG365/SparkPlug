@@ -30,7 +30,7 @@ export function usePoll(socket: SparkPlugSocket | null): PollState {
     };
     const onClosed = (pollId: string) => {
       if (pollIdRef.current !== pollId) return;
-      setPoll((prev) => (prev ? { ...prev, isOpen: false } : prev));
+      setPoll((prev) => (prev ? { ...prev, status: 'closed' } : prev));
     };
     socket.on('poll', onPoll);
     socket.on('pollResults', onResults);

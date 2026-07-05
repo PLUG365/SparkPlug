@@ -61,7 +61,7 @@ export default function Audience() {
   const overflowCount = sortedQuestions.length - visibleQuestions.length;
 
   const vote = (index: number) => {
-    if (!poll?.isOpen || !socket) return;
+    if (poll?.status !== 'open' || !socket) return;
     socket.emit('vote', poll.id, index);
     setMyVote({ pollId: poll.id, index });
   };
@@ -89,10 +89,10 @@ export default function Audience() {
         </span>
       </header>
 
-      {poll && (
+      {poll && poll.status === 'open' && (
         <section aria-label="アンケート" style={{ margin: '1.5rem 0', padding: '1rem', border: `3px solid ${BRAND.red}`, borderRadius: 18 }}>
           <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>
-            📊 {poll.question} {poll.isOpen ? '' : '（締切）'}
+            📊 {poll.question}
           </h2>
           {poll.options.map((opt, i) => {
             const isMine = myVote?.pollId === poll.id && myVote.index === i;
@@ -101,10 +101,9 @@ export default function Audience() {
               <button
                 key={i}
                 onClick={() => vote(i)}
-                disabled={!poll.isOpen}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
-                  padding: '0.6rem 0.8rem', borderRadius: 12, cursor: poll.isOpen ? 'pointer' : 'default',
+                  padding: '0.6rem 0.8rem', borderRadius: 12, cursor: 'pointer',
                   border: isMine ? `3px solid ${BRAND.red}` : '2px solid #ccc',
                   background: `linear-gradient(90deg, #f2f7c4 ${pct}%, #fff ${pct}%)`,
                 }}
@@ -115,7 +114,7 @@ export default function Audience() {
             );
           })}
           <p style={{ fontSize: '0.8rem', color: '#888', margin: '4px 0 0' }}>
-            {total}票{poll.isOpen ? '・タップで投票（変更可）' : ''}
+            {total}票・タップで投票（変更可）
           </p>
         </section>
       )}
@@ -149,13 +148,10 @@ export default function Audience() {
                 key={kind}
                 onClick={() => socket?.emit('se', kind)}
                 disabled={!connected}
-                // 円形・太縁取り。emoji+label が収まるよう縦積み＆文字は小さめ
-                style={{
-                  ...circleButtonStyle(borderColors[i % borderColors.length], 56),
-                  flexDirection: 'column', fontSize: '0.65rem', gap: 2,
-                }}
+                style={{ ...circleButtonStyle(borderColors[i % borderColors.length], 56), fontSize: '1.8rem' }}
+                aria-label={label}
               >
-                {emoji} {label}
+                {emoji}
               </button>
             );
           })}
