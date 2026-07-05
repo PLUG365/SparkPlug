@@ -62,7 +62,8 @@ npm run dev:web        # http://localhost:5173
 - [x] 選択式アンケート + リアルタイム集計（ホスト作成/締切、投票し直し可、スクリーンにライブ表示）
 - [ ] Dockerfile + Azure Container Apps デプロイ（Bicep）
 - [ ] Azure Static Web Apps デプロイ + GitHub Actions CD
-- [ ] イベントログ永続化（Cosmos DB）+ CSV エクスポート
+- [x] ログ CSV エクスポート（UTF-8 BOM、Excel対応。※現状 in-memory、サーバー再起動で消える）
+- [ ] イベントログ永続化（Cosmos DB）
 - [ ] 発表者ビュー（エモメーター・バックチャンネル・質問トリアージ）
 - [ ] AI 振り返り分析
 
