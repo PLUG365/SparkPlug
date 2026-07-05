@@ -64,6 +64,12 @@ function formatJst(at: number): string {
   );
 }
 
+/** AAコメントのサニタイズ。行頭・行内の空白は整列に必要なので保持し、全体の trim と行数・文字数の上限だけ適用する */
+function sanitizeAsciiArt(raw: string): string {
+  const lines = raw.replace(/\r\n/g, '\n').split('\n').slice(0, 20); // 最大20行
+  return lines.join('\n').slice(0, 500).trim(); // 最大500文字、前後の空行のみ除去
+}
+
 /** CSV の1フィールドをエスケープする。カンマ・引用符・改行を含む場合は "" で囲む。 */
 function csvField(value: string): string {
   if (/[",\r\n]/.test(value)) {
@@ -325,20 +331,22 @@ io.on('connection', (socket) => {
     appendLog(joinedEventId, { at: Date.now(), type: 'リアクション', content: kind });
   });
 
-  socket.on('comment', (body, displayName) => {
+  socket.on('comment', (body, displayName, isAsciiArt) => {
     if (!joinedEventId) return;
-    const trimmed = body.trim().slice(0, 200);
+    // AA は整列のため空白・改行を保持したサニタイズ、通常コメントは従来通り1行 trim
+    const trimmed = isAsciiArt ? sanitizeAsciiArt(body) : body.trim().slice(0, 200);
     if (!trimmed) return;
     io.to(roomOf(joinedEventId)).emit('comment', {
       id: randomUUID(),
       eventId: joinedEventId,
       body: trimmed,
       displayName,
+      isAsciiArt: isAsciiArt || undefined,
       at: Date.now(),
     });
     appendLog(joinedEventId, {
       at: Date.now(),
-      type: 'コメント',
+      type: isAsciiArt ? 'AA' : 'コメント',
       content: trimmed,
       displayName: displayName ?? '',
     });

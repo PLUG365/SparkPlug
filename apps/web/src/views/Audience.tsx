@@ -40,6 +40,8 @@ export default function Audience() {
   const [name, setName] = useState('');
   // ON のとき質問として送る（表示名必須）
   const [asQuestion, setAsQuestion] = useState(false);
+  // ON のとき AA（アスキーアート）として送る。改行・空白を保持して等幅で流す
+  const [aaMode, setAaMode] = useState(false);
   const [myVote, setMyVote] = useState<{ pollId: string; index: number } | null>(null);
   // 自分がいいねした質問 id（ローカル表示用トグル）
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
@@ -67,14 +69,21 @@ export default function Audience() {
   };
 
   const sendComment = () => {
-    const body = comment.trim();
-    if (!body || !socket) return;
+    if (!socket) return;
     if (asQuestion) {
       // 質問として送る。表示名は必須
+      const body = comment.trim();
+      if (!body) return;
       const trimmedName = name.trim();
       if (!trimmedName) return;
       socket.emit('question', body, trimmedName);
+    } else if (aaMode) {
+      // AA として送る。空白判定にだけ trim を使い、送信は改行・インデントを潰さない素の値を渡す
+      if (!comment.trim()) return;
+      socket.emit('comment', comment, name.trim() || undefined, true);
     } else {
+      const body = comment.trim();
+      if (!body) return;
       socket.emit('comment', body, name.trim() || undefined);
     }
     setComment('');
@@ -159,19 +168,41 @@ export default function Audience() {
       </section>
 
       <section aria-label="コメント">
-        <label
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-            fontSize: '0.85rem', color: asQuestion ? BRAND.yellow : '#666', cursor: 'pointer',
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={asQuestion}
-            onChange={(e) => setAsQuestion(e.target.checked)}
-          />
-          ❓ 質問として送信
-        </label>
+        {/* 質問・AA の2モードは排他。片方をONにするともう片方は自動でOFFにする */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+          <label
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: '0.85rem', color: asQuestion ? BRAND.yellow : '#666', cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={asQuestion}
+              onChange={(e) => {
+                setAsQuestion(e.target.checked);
+                if (e.target.checked) setAaMode(false);
+              }}
+            />
+            ❓ 質問として送信
+          </label>
+          <label
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: '0.85rem', color: aaMode ? BRAND.red : '#666', cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={aaMode}
+              onChange={(e) => {
+                setAaMode(e.target.checked);
+                if (e.target.checked) setAsQuestion(false);
+              }}
+            />
+            🎨 AAとして送信
+          </label>
+        </div>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -186,22 +217,43 @@ export default function Audience() {
             fontSize: 16,
           }}
         />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendComment()}
-            placeholder={asQuestion ? '発表者への質問…（例: マイクの音量どうですか？）' : 'コメントを流す…'}
-            maxLength={200}
-            style={{
-              flex: 1, padding: '0.6rem',
-              // 質問モードでは黄色ボーダーで「質問として送る」状態を明示。通常は太さ2px黒縁取り
-              border: asQuestion ? `2px solid ${BRAND.yellow}` : `2px solid ${BRAND.black}`,
-              borderRadius: 10,
-              // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
-              fontSize: 16,
-            }}
-          />
+        <div style={{ display: 'flex', gap: 8, alignItems: aaMode ? 'flex-end' : 'stretch' }}>
+          {aaMode ? (
+            // AAモードでは複数行・等幅で貼り付けられるよう textarea に切り替える
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="AAをここに貼り付け…"
+              rows={6}
+              maxLength={500}
+              style={{
+                flex: 1, padding: '0.6rem',
+                border: `2px solid ${BRAND.red}`,
+                borderRadius: 10,
+                fontFamily: 'monospace',
+                // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
+                fontSize: 16,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+          ) : (
+            <input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && sendComment()}
+              placeholder={asQuestion ? '発表者への質問…（例: マイクの音量どうですか？）' : 'コメントを流す…'}
+              maxLength={200}
+              style={{
+                flex: 1, padding: '0.6rem',
+                // 質問モードでは黄色ボーダーで「質問として送る」状態を明示。通常は太さ2px黒縁取り
+                border: asQuestion ? `2px solid ${BRAND.yellow}` : `2px solid ${BRAND.black}`,
+                borderRadius: 10,
+                // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
+                fontSize: 16,
+              }}
+            />
+          )}
           <button
             onClick={sendComment}
             // 質問モードでは表示名が空なら送信不可

@@ -26,6 +26,8 @@ export default function Screen() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'screen');
   const [comments, setComments] = useState<FlyingComment[]>([]);
+  // AAコメントは通常コメントと別枠で管理（等幅・改行保持でゆっくり流す）
+  const [asciiComments, setAsciiComments] = useState<FlyingComment[]>([]);
   const [questions, setQuestions] = useState<FlyingQuestion[]>([]);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [sePops, setSePops] = useState<SePop[]>([]);
@@ -59,6 +61,12 @@ export default function Screen() {
   useEffect(() => {
     if (!socket) return;
     const onComment = (c: ChatComment) => {
+      if (c.isAsciiArt) {
+        // AA は複数行で高さが出るため縦位置を上側(5〜45%)に寄せ、22秒かけてゆっくり流す
+        setAsciiComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 40 }]);
+        setTimeout(() => setAsciiComments((prev) => prev.filter((x) => x.id !== c.id)), 22000);
+        return;
+      }
       setComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 60 }]);
       setTimeout(() => setComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
     };
@@ -170,6 +178,23 @@ export default function Screen() {
         >
           {c.body}
           {c.displayName && <span style={{ fontSize: '1rem', color: '#cddc29', marginLeft: 8 }}>@{c.displayName}</span>}
+        </div>
+      ))}
+
+      {asciiComments.map((c) => (
+        <div
+          key={c.id}
+          style={{
+            position: 'absolute', top: `${c.top}%`, left: 0, whiteSpace: 'pre',
+            fontFamily: 'monospace', fontSize: '1.1rem', lineHeight: 1.15, fontWeight: 700,
+            color: '#fff', background: 'rgba(0,0,0,0.75)', padding: '0.5rem 1rem', borderRadius: 8,
+            animation: 'flyLeft 22s linear forwards', willChange: 'transform',
+          }}
+        >
+          {c.body}
+          {c.displayName && (
+            <div style={{ fontSize: '0.75rem', color: '#cddc29', marginTop: 4 }}>@{c.displayName}</div>
+          )}
         </div>
       ))}
 
