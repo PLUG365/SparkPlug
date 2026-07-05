@@ -50,6 +50,8 @@ export interface ClientToServerEvents {
   join: (payload: JoinPayload) => void;
   reaction: (kind: ReactionKind) => void;
   comment: (body: string, displayName?: string) => void;
+  /** 発表者にだけ届く匿名の連絡（バックチャンネル）。表示名は送らない */
+  backchannel: (body: string) => void;
   se: (kind: SeKind) => void;
   /** host ロールのみ。既存のアクティブなアンケートは自動クローズされる */
   createPoll: (question: string, options: string[]) => void;
@@ -64,6 +66,8 @@ export interface ServerToClientEvents {
   joined: (payload: { eventId: string; participantCount: number }) => void;
   reaction: (reaction: Reaction) => void;
   comment: (comment: ChatComment) => void;
+  /** presenter ロールにだけ配信される匿名の連絡（displayName は無し） */
+  backchannel: (comment: ChatComment) => void;
   se: (se: Se) => void;
   participantCount: (count: number) => void;
   /** アンケート開始（途中参加者には join 時に現状が送られる） */

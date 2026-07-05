@@ -26,6 +26,8 @@ export default function Audience() {
   const { poll, counts, total } = usePoll(socket);
   const [comment, setComment] = useState('');
   const [name, setName] = useState('');
+  // ON のとき発表者にだけ匿名で送る（backchannel）
+  const [toPresenter, setToPresenter] = useState(false);
   const [myVote, setMyVote] = useState<{ pollId: string; index: number } | null>(null);
 
   const vote = (index: number) => {
@@ -37,7 +39,12 @@ export default function Audience() {
   const sendComment = () => {
     const body = comment.trim();
     if (!body || !socket) return;
-    socket.emit('comment', body, name.trim() || undefined);
+    if (toPresenter) {
+      // 発表者にだけ届く匿名の連絡。表示名は送らない
+      socket.emit('backchannel', body);
+    } else {
+      socket.emit('comment', body, name.trim() || undefined);
+    }
     setComment('');
   };
 
@@ -118,21 +125,43 @@ export default function Audience() {
       </section>
 
       <section aria-label="コメント">
+        <label
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+            fontSize: '0.85rem', color: toPresenter ? '#d0342c' : '#666', cursor: 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={toPresenter}
+            onChange={(e) => setToPresenter(e.target.checked)}
+          />
+          🎤 発表者にだけ送る（匿名）
+        </label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="表示名（空なら匿名）"
           maxLength={20}
-          style={{ width: '100%', padding: '0.5rem', marginBottom: 8, boxSizing: 'border-box' }}
+          disabled={toPresenter}
+          style={{
+            width: '100%', padding: '0.5rem', marginBottom: 8, boxSizing: 'border-box',
+            background: toPresenter ? '#f4f4f4' : '#fff',
+          }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendComment()}
-            placeholder="コメントを流す…"
+            placeholder={toPresenter ? '発表者への連絡…（例: マイクが小さいです）' : 'コメントを流す…'}
             maxLength={200}
-            style={{ flex: 1, padding: '0.6rem' }}
+            style={{
+              flex: 1, padding: '0.6rem',
+              // ON のとき赤ボーダーで「発表者にだけ送る」状態を明示
+              border: toPresenter ? '2px solid #d0342c' : '1px solid #ccc',
+              borderRadius: 4,
+            }}
           />
           <button
             onClick={sendComment}
