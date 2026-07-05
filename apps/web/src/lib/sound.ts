@@ -92,7 +92,7 @@ export class SePlayer {
     src.start(at);
   }
 
-  /** 太鼓「ドン」: 低域サイン波のピッチ落ち + 皮鳴りノイズ */
+  /** 'don' の合成フォールバック（mp3読み込み失敗時のみ）: 低域サイン波のピッチ落ち + 皮鳴りノイズ */
   private don(ctx: AudioContext, t: number): void {
     const osc = ctx.createOscillator();
     osc.type = 'sine';

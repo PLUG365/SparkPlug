@@ -82,7 +82,7 @@ SparkPlug は [PLUG（Power Platform Local User Group）](https://github.com/PLU
 ## クレジット
 
 効果音素材: [OtoLogic](https://otologic.jp/)（CC BY 4.0）
-`apps/web/public/se/` の mp3 は OtoLogic 素材（Percussive_Accent04 / Hyoshigi01 / Applause02）をリネームして使用。
+`apps/web/public/se/` の mp3 は OtoLogic 素材（Tambourine / Hyoshigi01 / Applause02）をリネームして使用。
 
 ## License
 
