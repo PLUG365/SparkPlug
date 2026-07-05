@@ -18,7 +18,7 @@ const STATUS_BADGE: Record<QuestionStatus, string | null> = {
 const QUESTION_DISPLAY_LIMIT = 20;
 
 const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
-  { kind: 'don', emoji: '🪇', label: 'タンバリン' },
+  { kind: 'don', emoji: '🥁', label: 'タンバリン' },
   { kind: 'ka', emoji: '🪵', label: 'カッ' },
   { kind: 'clap', emoji: '👏', label: '拍手' },
 ];
