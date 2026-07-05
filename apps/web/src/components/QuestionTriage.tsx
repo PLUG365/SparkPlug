@@ -56,11 +56,11 @@ export default function QuestionTriage({ questions, onTriage }: QuestionTriagePr
                   <li
                     key={q.id}
                     style={{
-                      padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
+                      padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 14,
                       // 回答済みは薄いグレー背景で控えめに
                       background: status === 'done' ? '#f2f2f2' : '#fafafa',
                       // 新着セクションは黄色ボーダーで強調
-                      border: status === 'new' ? '2px solid #f5c400' : '1px solid #eee',
+                      border: status === 'new' ? '3px solid #f5c400' : '2px solid #eee',
                     }}
                   >
                     <div
@@ -94,8 +94,8 @@ export default function QuestionTriage({ questions, onTriage }: QuestionTriagePr
                           key={b.status}
                           onClick={() => onTriage(q.id, b.status)}
                           style={{
-                            fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: 6,
-                            border: '1px solid #cddc29', background: '#fff', cursor: 'pointer',
+                            fontSize: '0.75rem', padding: '0.2rem 0.7rem', borderRadius: 999,
+                            border: '2px solid #cddc29', background: '#fff', cursor: 'pointer',
                           }}
                         >
                           {b.label}

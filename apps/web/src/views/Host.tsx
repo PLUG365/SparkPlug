@@ -6,6 +6,7 @@ import { usePoll } from '../lib/usePoll';
 import { useQuestions } from '../lib/useQuestions';
 import QuestionTriage from '../components/QuestionTriage';
 import { SERVER_URL } from '../lib/socket';
+import { BRAND, headerBarStyle, pillBadgeStyle, pillButtonStyle } from '../lib/theme';
 
 const MAX_OPTIONS = 6;
 
@@ -33,10 +34,10 @@ export default function Host() {
 
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ fontSize: '1.4rem' }}>🎛️ ホスト｜{eventId}</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
-          <span style={{ fontSize: '0.9rem', color: '#666' }}>
+      <header style={headerBarStyle}>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>🎛️ ホスト｜{eventId}</h1>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span style={pillBadgeStyle(connected)}>
             {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
           </span>
           {/* イベントログを CSV でダウンロード（Excel 対応・BOM 付き） */}
@@ -44,9 +45,9 @@ export default function Host() {
             href={`${SERVER_URL}/events/${encodeURIComponent(eventId ?? '')}/export.csv`}
             download
             style={{
-              fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none',
-              padding: '0.25rem 0.7rem', borderRadius: 8,
-              border: '2px solid #cddc29', color: '#d0342c', whiteSpace: 'nowrap',
+              fontSize: '0.85rem', fontWeight: 700, textDecoration: 'none',
+              padding: '0.35rem 0.9rem', borderRadius: 999,
+              border: `2px solid ${BRAND.lime}`, color: BRAND.lime, whiteSpace: 'nowrap',
             }}
           >
             📥 ログCSV
@@ -54,7 +55,7 @@ export default function Host() {
         </div>
       </header>
 
-      <section aria-label="アンケート作成" style={{ margin: '1.5rem 0', padding: '1rem', border: '2px solid #cddc29', borderRadius: 12 }}>
+      <section aria-label="アンケート作成" style={{ margin: '1.5rem 0', padding: '1rem', border: `3px solid ${BRAND.lime}`, borderRadius: 18 }}>
         <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>📊 アンケートを作る</h2>
         <input
           value={question}
@@ -83,11 +84,7 @@ export default function Host() {
           <button
             onClick={createPoll}
             disabled={!canCreate}
-            style={{
-              padding: '0.4rem 1.2rem', borderRadius: 8, border: 'none', fontWeight: 600,
-              background: canCreate ? '#d0342c' : '#ccc', color: '#fff',
-              cursor: canCreate ? 'pointer' : 'default',
-            }}
+            style={pillButtonStyle({ disabled: !canCreate })}
           >
             開始
           </button>
@@ -98,7 +95,7 @@ export default function Host() {
       </section>
 
       {poll && (
-        <section aria-label="集計" style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: 12 }}>
+        <section aria-label="集計" style={{ padding: '1rem', border: '2px solid #ddd', borderRadius: 18 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <h2 style={{ fontSize: '1.1rem', margin: 0 }}>
               {poll.isOpen ? '🔴 実施中' : '⏹ 締切'}: {poll.question}
@@ -118,8 +115,8 @@ export default function Host() {
                   <span>{opt}</span>
                   <span>{counts[i] ?? 0}票 ({pct}%)</span>
                 </div>
-                <div style={{ background: '#eee', borderRadius: 6, height: 14 }}>
-                  <div style={{ width: `${pct}%`, background: '#cddc29', height: '100%', borderRadius: 6, transition: 'width 0.3s' }} />
+                <div style={{ background: '#eee', borderRadius: 999, height: 18 }}>
+                  <div style={{ width: `${pct}%`, background: BRAND.lime, height: '100%', borderRadius: 999, transition: 'width 0.3s' }} />
                 </div>
               </div>
             );
