@@ -62,9 +62,9 @@ export default function Screen() {
     if (!socket) return;
     const onComment = (c: ChatComment) => {
       if (c.isAsciiArt) {
-        // AA は複数行で高さが出るため縦位置を上側(5〜45%)に寄せ、22秒かけてゆっくり流す
+        // AA は複数行で高さが出るため縦位置を上側(5〜45%)に寄せる。速さは通常コメントと同じ12秒
         setAsciiComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 40 }]);
-        setTimeout(() => setAsciiComments((prev) => prev.filter((x) => x.id !== c.id)), 22000);
+        setTimeout(() => setAsciiComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
         return;
       }
       setComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 60 }]);
@@ -110,6 +110,23 @@ export default function Screen() {
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  // ブラウザの自動再生ポリシー上、音の解除にはこのページ上でのユーザー操作が必須。
+  // 「音を有効にする」ボタンに限らず、ページ上の最初のクリック/タップ/キー操作で自動的に解除する。
+  // （例: 画面共有ボタンを押しただけでも解除される）誰も操作しない場合の保険として、ボタン自体は残す。
+  useEffect(() => {
+    if (soundOn) return;
+    const unlock = () => {
+      sePlayer.enable();
+      setSoundOn(true);
+    };
+    document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', unlock);
+      document.removeEventListener('keydown', unlock);
+    };
+  }, [soundOn]);
 
   // 画面共有を開始。getDisplayMedia はセキュアコンテキスト（localhost / https）でのみ存在する
   const startShare = async () => {
@@ -188,7 +205,7 @@ export default function Screen() {
             position: 'absolute', top: `${c.top}%`, left: 0, whiteSpace: 'pre',
             fontFamily: 'monospace', fontSize: '1.1rem', lineHeight: 1.15, fontWeight: 700,
             color: '#fff', background: 'rgba(0,0,0,0.75)', padding: '0.5rem 1rem', borderRadius: 8,
-            animation: 'flyLeft 22s linear forwards', willChange: 'transform',
+            animation: 'flyLeft 12s linear forwards', willChange: 'transform',
           }}
         >
           {c.body}
