@@ -45,17 +45,20 @@ export function pillBadgeStyle(active: boolean): CSSProperties {
 /**
  * 送信・開始などの主要CTAボタン用のピル型スタイル。
  * デフォルトは赤地・白太字。color で背景色を差し替え可能。
+ * 黄緑・黄地は明るく白文字だとコントラスト不足になるため、その場合は自動的に黒文字にする。
  * disabled 時はグレー地・カーソル既定。
  */
 export function pillButtonStyle(opts: { disabled?: boolean; color?: string } = {}): CSSProperties {
   const { disabled = false, color = BRAND.red } = opts;
+  const lightBackgrounds: string[] = [BRAND.lime, BRAND.yellow];
+  const textColor = lightBackgrounds.includes(color) ? BRAND.black : '#fff';
   return {
     borderRadius: 999,
     border: 'none',
     fontWeight: 700,
     padding: '0.5rem 1.2rem',
     background: disabled ? '#ccc' : color,
-    color: '#fff',
+    color: disabled ? '#666' : textColor,
     cursor: disabled ? 'default' : 'pointer',
   };
 }

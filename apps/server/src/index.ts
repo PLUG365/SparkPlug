@@ -117,13 +117,18 @@ function roleRoomOf(eventId: string, role: Role): string {
   return `event:${eventId}:role:${role}`;
 }
 
-interface ActivePoll {
+/** アンケート1件と、投票状況。下書き・実施中・締切済みのすべてを保持する */
+interface PollRecord {
   poll: Poll;
   /** socket.id → 選んだ選択肢 index。投票し直しは上書き */
   voters: Map<string, number>;
 }
 
-const activePolls = new Map<string, ActivePoll>();
+/** 1イベントあたりのアンケート保持上限。超えたら新規作成を無視する。 */
+const POLL_LIMIT = 100;
+
+/** eventId → アンケートレコード配列（作成順。下書き・実施中・締切済みを含む全履歴） */
+const eventPolls = new Map<string, PollRecord[]>();
 
 // ── 質問ストア ──────────────────────────────────────────────────
 /** 質問1件と、いいねした socket.id の集合 */
@@ -148,14 +153,20 @@ const TRIAGE_LOG_LABEL: Record<QuestionStatus, string> = {
   done: '回答済み',
 };
 
-function countsOf(active: ActivePoll): number[] {
-  const counts = active.poll.options.map(() => 0);
-  for (const idx of active.voters.values()) counts[idx]++;
+function countsOf(record: PollRecord): number[] {
+  const counts = record.poll.options.map(() => 0);
+  for (const idx of record.voters.values()) counts[idx]++;
   return counts;
 }
 
-function emitResults(eventId: string, active: ActivePoll): void {
-  io.to(roomOf(eventId)).emit('pollResults', active.poll.id, countsOf(active), active.voters.size);
+function emitResults(eventId: string, record: PollRecord): void {
+  io.to(roomOf(eventId)).emit('pollResults', record.poll.id, countsOf(record), record.voters.size);
+}
+
+/** host ロールのルームへ、そのイベントの全アンケート一覧を配信する */
+function emitPollsList(eventId: string): void {
+  const polls = (eventPolls.get(eventId) ?? []).map((r) => r.poll);
+  io.to(roleRoomOf(eventId, 'host')).emit('polls', polls);
 }
 
 const SE_THROTTLE_MS = 400;
@@ -174,10 +185,21 @@ io.on('connection', (socket) => {
     const count = (await io.in(roomOf(eventId)).fetchSockets()).length;
     socket.emit('joined', { eventId, participantCount: count });
     io.to(roomOf(eventId)).emit('participantCount', count);
-    const active = activePolls.get(eventId);
-    if (active) {
-      socket.emit('poll', active.poll);
-      socket.emit('pollResults', active.poll.id, countsOf(active), active.voters.size);
+    // 実施中のアンケートがあれば本人にだけ現状を送る（全ロール共通）
+    const polls = eventPolls.get(eventId);
+    const openRecord = polls?.find((r) => r.poll.status === 'open');
+    if (openRecord) {
+      socket.emit('poll', openRecord.poll);
+      socket.emit('pollResults', openRecord.poll.id, countsOf(openRecord), openRecord.voters.size);
+    }
+    // host には下書き含む全件を初回同期する
+    if (role === 'host') {
+      socket.emit('polls', polls?.map((r) => r.poll) ?? []);
+      // 締切済み分も含め全アンケートの集計を個別に再送する。
+      // openRecord のみ再送だと、host のページ再読み込みで締切済みの票数が 0 に見えてしまうため。
+      for (const record of polls ?? []) {
+        socket.emit('pollResults', record.poll.id, countsOf(record), record.voters.size);
+      }
     }
     // その時点の質問一覧を本人にだけ一括同期（アンケート同期と同じパターン）
     const records = eventQuestions.get(eventId);
@@ -193,59 +215,83 @@ io.on('connection', (socket) => {
     const q = question.trim().slice(0, 100);
     const opts = options.map((o) => o.trim().slice(0, 50)).filter(Boolean);
     if (!q || opts.length < 2 || opts.length > 6) return;
-    const prev = activePolls.get(joinedEventId);
-    if (prev) io.to(roomOf(joinedEventId)).emit('pollClosed', prev.poll.id);
-    const active: ActivePoll = {
+    // アンケートストアを確保し、上限を超えていたら新規作成を無視する
+    let records = eventPolls.get(joinedEventId);
+    if (!records) {
+      records = [];
+      eventPolls.set(joinedEventId, records);
+    }
+    if (records.length >= POLL_LIMIT) return;
+    // 下書きとして追加するだけ。room 全体への poll 配信・CSVログは開始時まで行わない
+    records.push({
       poll: {
         id: randomUUID(),
         eventId: joinedEventId,
         question: q,
         options: opts,
-        isOpen: true,
+        status: 'draft',
         at: Date.now(),
       },
       voters: new Map(),
-    };
-    activePolls.set(joinedEventId, active);
-    io.to(roomOf(joinedEventId)).emit('poll', active.poll);
-    emitResults(joinedEventId, active);
-    // content: `質問: 選択肢1 / 選択肢2 / ...`
+    });
+    emitPollsList(joinedEventId);
+  });
+
+  socket.on('startPoll', (pollId) => {
+    if (!joinedEventId || joinedRole !== 'host') return;
+    const records = eventPolls.get(joinedEventId);
+    const target = records?.find((r) => r.poll.id === pollId && r.poll.status === 'draft');
+    if (!records || !target) return;
+    // 実施中の別アンケートがあれば自動的に締め切る
+    const openRecord = records.find((r) => r.poll.status === 'open');
+    if (openRecord) {
+      openRecord.poll.status = 'closed';
+      io.to(roomOf(joinedEventId)).emit('pollClosed', openRecord.poll.id);
+    }
+    target.poll.status = 'open';
+    io.to(roomOf(joinedEventId)).emit('poll', target.poll);
+    emitResults(joinedEventId, target);
+    emitPollsList(joinedEventId);
+    // content: `質問: 選択肢1 / 選択肢2 / ...`。開始時にのみ記録する
     appendLog(joinedEventId, {
-      at: active.poll.at,
+      at: Date.now(),
       type: 'アンケート開始',
-      content: `${q}: ${opts.join(' / ')}`,
+      content: `${target.poll.question}: ${target.poll.options.join(' / ')}`,
     });
   });
 
   socket.on('vote', (pollId, optionIndex) => {
     if (!joinedEventId) return;
-    const active = activePolls.get(joinedEventId);
-    if (!active || !active.poll.isOpen || active.poll.id !== pollId) return;
-    if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= active.poll.options.length) return;
-    active.voters.set(socket.id, optionIndex);
-    emitResults(joinedEventId, active);
+    const records = eventPolls.get(joinedEventId);
+    const record = records?.find((r) => r.poll.id === pollId && r.poll.status === 'open');
+    if (!record) return;
+    if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= record.poll.options.length) return;
+    record.voters.set(socket.id, optionIndex);
+    emitResults(joinedEventId, record);
     // 投票し直しも1行ずつそのまま記録。content は選ばれた選択肢のラベル
     appendLog(joinedEventId, {
       at: Date.now(),
       type: '投票',
-      content: active.poll.options[optionIndex],
+      content: record.poll.options[optionIndex],
     });
   });
 
-  socket.on('closePoll', () => {
+  socket.on('closePoll', (pollId) => {
     if (!joinedEventId || joinedRole !== 'host') return;
-    const active = activePolls.get(joinedEventId);
-    if (!active || !active.poll.isOpen) return;
-    active.poll.isOpen = false;
-    emitResults(joinedEventId, active);
-    io.to(roomOf(joinedEventId)).emit('pollClosed', active.poll.id);
+    const records = eventPolls.get(joinedEventId);
+    const record = records?.find((r) => r.poll.id === pollId);
+    if (!record || record.poll.status !== 'open') return;
+    record.poll.status = 'closed';
+    emitResults(joinedEventId, record);
+    io.to(roomOf(joinedEventId)).emit('pollClosed', record.poll.id);
+    emitPollsList(joinedEventId);
     // content: `質問: 選択肢1=3票 / 選択肢2=1票` の最終集計
-    const counts = countsOf(active);
-    const summary = active.poll.options.map((o, i) => `${o}=${counts[i]}票`).join(' / ');
+    const counts = countsOf(record);
+    const summary = record.poll.options.map((o, i) => `${o}=${counts[i]}票`).join(' / ');
     appendLog(joinedEventId, {
       at: Date.now(),
       type: 'アンケート締切',
-      content: `${active.poll.question}: ${summary}`,
+      content: `${record.poll.question}: ${summary}`,
     });
   });
 

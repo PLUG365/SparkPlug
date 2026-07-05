@@ -43,7 +43,7 @@ export default function Screen() {
   useEffect(() => {
     if (!poll) return;
     setPollVisible(true);
-    if (!poll.isOpen) {
+    if (poll.status !== 'open') {
       const timer = setTimeout(() => setPollVisible(false), 8000);
       return () => clearTimeout(timer);
     }
@@ -220,7 +220,7 @@ export default function Screen() {
             📊 {poll.question}
           </div>
           <div style={{ fontSize: '0.85rem', color: '#cddc29', marginBottom: 10 }}>
-            {poll.isOpen ? `投票受付中 ｜ ${total}票` : `締切 ｜ ${total}票`}
+            {poll.status === 'open' ? `投票受付中 ｜ ${total}票` : `締切 ｜ ${total}票`}
           </div>
           {poll.options.map((opt, i) => {
             const pct = total ? Math.round(((counts[i] ?? 0) / total) * 100) : 0;
