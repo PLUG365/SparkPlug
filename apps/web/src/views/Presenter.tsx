@@ -4,6 +4,7 @@ import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { useQuestions } from '../lib/useQuestions';
 import QuestionTriage from '../components/QuestionTriage';
+import { BRAND, headerBarStyle, pillBadgeStyle } from '../lib/theme';
 
 // ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
 /** 棒グラフの対象窓（秒）と 1 バケットの幅（秒） → 60 本 */
@@ -142,9 +143,9 @@ export default function Presenter() {
 
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ fontSize: '1.3rem' }}>🎤 発表者ビュー {eventId}</h1>
-        <span style={{ fontSize: '0.85rem', color: '#666' }}>
+      <header style={headerBarStyle}>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>🎤 発表者ビュー {eventId}</h1>
+        <span style={pillBadgeStyle(connected)}>
           {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
         </span>
       </header>
@@ -160,8 +161,8 @@ export default function Presenter() {
         <div
           style={{
             display: 'flex', alignItems: 'center', gap: 12,
-            padding: '0.6rem 0.9rem', borderRadius: 12,
-            border: '2px solid #cddc29', background: '#fbfde6', marginBottom: 12,
+            padding: '0.6rem 0.9rem', borderRadius: 18,
+            border: `3px solid ${BRAND.lime}`, background: '#fbfde6', marginBottom: 12,
           }}
         >
           <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>{heat.emoji}</span>

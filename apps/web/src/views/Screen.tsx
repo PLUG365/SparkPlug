@@ -5,6 +5,7 @@ import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
 import { useQuestions } from '../lib/useQuestions';
 import { sePlayer } from '../lib/sound';
+import { BRAND, pillBadgeStyle } from '../lib/theme';
 
 const EMOJI: Record<ReactionKind, string> = {
   clap: '👏', laugh: '😆', heart: '❤️', surprise: '😲',
@@ -142,8 +143,12 @@ export default function Screen() {
         @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
       `}</style>
 
-      <div style={{ position: 'absolute', top: 16, left: 24, fontSize: '1.1rem', color: '#cddc29' }}>
-        SparkPlug ⚡ {eventId} {connected ? `｜ ${participantCount}人が参加中` : '｜ 接続中…'}
+      <div style={{ position: 'absolute', top: 16, left: 24, fontSize: '1.1rem', color: '#cddc29', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span>SparkPlug ⚡ {eventId}</span>
+        {/* 参加者数を黄緑ピルで軽く強調（未接続時はグレーピル） */}
+        <span style={pillBadgeStyle(connected)}>
+          {connected ? `${participantCount}人が参加中` : '接続中…'}
+        </span>
       </div>
 
       {comments.map((c) => (
@@ -263,8 +268,8 @@ export default function Screen() {
             onClick={() => { sePlayer.enable(); setSoundOn(true); }}
             style={{
               padding: '0.6rem 1.2rem',
-              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
-              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+              borderRadius: 999, border: `2px solid ${BRAND.lime}`, background: 'transparent',
+              color: BRAND.lime, fontSize: '1rem', cursor: 'pointer',
             }}
           >
             🔊 音を有効にする
@@ -275,8 +280,8 @@ export default function Screen() {
             onClick={stopShare}
             style={{
               padding: '0.6rem 1.2rem',
-              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
-              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+              borderRadius: 999, border: `2px solid ${BRAND.lime}`, background: 'transparent',
+              color: BRAND.lime, fontSize: '1rem', cursor: 'pointer',
             }}
           >
             ⏹ 共有を終了
@@ -286,8 +291,8 @@ export default function Screen() {
             onClick={startShare}
             style={{
               padding: '0.6rem 1.2rem',
-              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
-              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+              borderRadius: 999, border: `2px solid ${BRAND.lime}`, background: 'transparent',
+              color: BRAND.lime, fontSize: '1rem', cursor: 'pointer',
             }}
           >
             🖥️ 画面を共有

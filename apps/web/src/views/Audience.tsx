@@ -4,6 +4,7 @@ import type { QuestionStatus, ReactionKind, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
 import { useQuestions } from '../lib/useQuestions';
+import { BRAND, headerBarStyle, pillBadgeStyle, pillButtonStyle, circleButtonStyle } from '../lib/theme';
 
 /** 参加者一覧に出すステータスバッジ（新着はバッジなし） */
 const STATUS_BADGE: Record<QuestionStatus, string | null> = {
@@ -81,15 +82,15 @@ export default function Audience() {
 
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1 style={{ fontSize: '1.3rem' }}>SparkPlug ⚡ {eventId}</h1>
-        <span style={{ fontSize: '0.85rem', color: '#666' }}>
+      <header style={headerBarStyle}>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>SparkPlug ⚡ {eventId}</h1>
+        <span style={pillBadgeStyle(connected)}>
           {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
         </span>
       </header>
 
       {poll && (
-        <section aria-label="アンケート" style={{ margin: '1.5rem 0', padding: '1rem', border: '2px solid #d0342c', borderRadius: 12 }}>
+        <section aria-label="アンケート" style={{ margin: '1.5rem 0', padding: '1rem', border: `3px solid ${BRAND.red}`, borderRadius: 18 }}>
           <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>
             📊 {poll.question} {poll.isOpen ? '' : '（締切）'}
           </h2>
@@ -103,8 +104,8 @@ export default function Audience() {
                 disabled={!poll.isOpen}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
-                  padding: '0.6rem 0.8rem', borderRadius: 8, cursor: poll.isOpen ? 'pointer' : 'default',
-                  border: isMine ? '2px solid #d0342c' : '1px solid #ccc',
+                  padding: '0.6rem 0.8rem', borderRadius: 12, cursor: poll.isOpen ? 'pointer' : 'default',
+                  border: isMine ? `3px solid ${BRAND.red}` : '2px solid #ccc',
                   background: `linear-gradient(90deg, #f2f7c4 ${pct}%, #fff ${pct}%)`,
                 }}
               >
@@ -119,39 +120,45 @@ export default function Audience() {
         </section>
       )}
 
-      <section aria-label="リアクション" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '1.5rem 0' }}>
-        {REACTIONS.map(({ kind, emoji, label }) => (
-          <button
-            key={kind}
-            onClick={() => socket?.emit('reaction', kind)}
-            disabled={!connected}
-            style={{
-              fontSize: '1.8rem', padding: '0.6rem 1rem', borderRadius: 12,
-              border: '2px solid #cddc29', background: '#fff', cursor: 'pointer',
-            }}
-            aria-label={label}
-          >
-            {emoji}
-          </button>
-        ))}
+      <section aria-label="リアクション" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '1.5rem 0' }}>
+        {REACTIONS.map(({ kind, emoji, label }, i) => {
+          // 4色（黄緑・赤・黄・黒）を順番に割り当て
+          const borderColors = [BRAND.lime, BRAND.red, BRAND.yellow, BRAND.black];
+          return (
+            <button
+              key={kind}
+              onClick={() => socket?.emit('reaction', kind)}
+              disabled={!connected}
+              style={{ ...circleButtonStyle(borderColors[i % borderColors.length], 56), fontSize: '1.8rem' }}
+              aria-label={label}
+            >
+              {emoji}
+            </button>
+          );
+        })}
       </section>
 
       <section aria-label="効果音" style={{ margin: '0 0 1.5rem' }}>
         <p style={{ fontSize: '0.8rem', color: '#888', margin: '0 0 6px' }}>会場に音を鳴らす 🔊</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {SOUNDS.map(({ kind, emoji, label }) => (
-            <button
-              key={kind}
-              onClick={() => socket?.emit('se', kind)}
-              disabled={!connected}
-              style={{
-                fontSize: '1rem', padding: '0.5rem 0.8rem', borderRadius: 12,
-                border: '2px solid #d0342c', background: '#fff', cursor: 'pointer',
-              }}
-            >
-              {emoji} {label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {SOUNDS.map(({ kind, emoji, label }, i) => {
+            // リアクションと同様、4色を順番に割り当て（SEは3種）
+            const borderColors = [BRAND.lime, BRAND.red, BRAND.yellow, BRAND.black];
+            return (
+              <button
+                key={kind}
+                onClick={() => socket?.emit('se', kind)}
+                disabled={!connected}
+                // 円形・太縁取り。emoji+label が収まるよう縦積み＆文字は小さめ
+                style={{
+                  ...circleButtonStyle(borderColors[i % borderColors.length], 56),
+                  flexDirection: 'column', fontSize: '0.65rem', gap: 2,
+                }}
+              >
+                {emoji} {label}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -159,7 +166,7 @@ export default function Audience() {
         <label
           style={{
             display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-            fontSize: '0.85rem', color: asQuestion ? '#f5c400' : '#666', cursor: 'pointer',
+            fontSize: '0.85rem', color: asQuestion ? BRAND.yellow : '#666', cursor: 'pointer',
           }}
         >
           <input
@@ -176,9 +183,9 @@ export default function Audience() {
           maxLength={20}
           style={{
             width: '100%', padding: '0.5rem', marginBottom: 8, boxSizing: 'border-box',
-            // 質問モードでは表示名入力欄を黄色ボーダーで必須と明示
-            border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
-            borderRadius: 4,
+            // 質問モードでは表示名入力欄を黄色ボーダーで必須と明示。通常は太さ2px黒縁取り
+            border: asQuestion ? `2px solid ${BRAND.yellow}` : `2px solid ${BRAND.black}`,
+            borderRadius: 10,
             // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
             fontSize: 16,
           }}
@@ -192,9 +199,9 @@ export default function Audience() {
             maxLength={200}
             style={{
               flex: 1, padding: '0.6rem',
-              // 質問モードでは黄色ボーダーで「質問として送る」状態を明示
-              border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
-              borderRadius: 4,
+              // 質問モードでは黄色ボーダーで「質問として送る」状態を明示。通常は太さ2px黒縁取り
+              border: asQuestion ? `2px solid ${BRAND.yellow}` : `2px solid ${BRAND.black}`,
+              borderRadius: 10,
               // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
               fontSize: 16,
             }}
@@ -203,10 +210,7 @@ export default function Audience() {
             onClick={sendComment}
             // 質問モードでは表示名が空なら送信不可
             disabled={!connected || !comment.trim() || (asQuestion && !name.trim())}
-            style={{
-              padding: '0.6rem 1.2rem', borderRadius: 8, border: 'none',
-              background: '#d0342c', color: '#fff', fontWeight: 600, cursor: 'pointer',
-            }}
+            style={pillButtonStyle({ disabled: !connected || !comment.trim() || (asQuestion && !name.trim()) })}
           >
             送信
           </button>
@@ -226,8 +230,8 @@ export default function Audience() {
                   key={q.id}
                   style={{
                     display: 'flex', alignItems: 'flex-start', gap: 8,
-                    padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
-                    background: '#fafafa', border: '1px solid #eee',
+                    padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 14,
+                    background: '#fafafa', border: '2px solid #eee',
                   }}
                 >
                   <div style={{ flex: 1 }}>
@@ -238,7 +242,7 @@ export default function Audience() {
                       <span
                         style={{
                           fontSize: '0.7rem', color: '#888', border: '1px solid #ddd',
-                          borderRadius: 6, padding: '0.05rem 0.4rem', marginRight: 6,
+                          borderRadius: 999, padding: '0.1rem 0.5rem', marginRight: 6,
                         }}
                       >
                         {badge}
@@ -251,9 +255,9 @@ export default function Audience() {
                     onClick={() => toggleLike(q.id)}
                     disabled={!connected}
                     style={{
-                      whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.3rem 0.6rem',
-                      borderRadius: 8, cursor: 'pointer',
-                      border: liked ? '2px solid #f5c400' : '1px solid #ccc',
+                      whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.3rem 0.8rem',
+                      borderRadius: 999, cursor: 'pointer',
+                      border: liked ? `2px solid ${BRAND.yellow}` : '2px solid #ccc',
                       background: liked ? '#fffbe6' : '#fff', fontWeight: 600,
                     }}
                   >
