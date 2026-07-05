@@ -7,7 +7,7 @@ import { useQuestions } from '../lib/useQuestions';
 import { sePlayer } from '../lib/sound';
 
 const EMOJI: Record<ReactionKind, string> = {
-  clap: '👏', fire: '🔥', laugh: '😂', heart: '❤️', surprise: '😲',
+  clap: '👏', laugh: '😆', heart: '❤️', surprise: '😲',
 };
 
 const SE_LABEL: Record<SeKind, string> = {
