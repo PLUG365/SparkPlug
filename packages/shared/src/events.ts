@@ -30,8 +30,8 @@ export interface ChatComment {
   at: number;
 }
 
-/** 質問のトリアージ状態。new=新着 / now=今答える / later=後で / offline=後日回答 */
-export type QuestionStatus = 'new' | 'now' | 'later' | 'offline';
+/** 質問のトリアージ状態。new=新着 / now=今答える / later=後で / offline=後日回答 / done=回答済み */
+export type QuestionStatus = 'new' | 'now' | 'later' | 'offline' | 'done';
 
 /** 参加者から発表者への質問。表示名は必須 */
 export interface Question {

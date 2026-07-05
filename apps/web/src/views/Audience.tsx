@@ -11,6 +11,7 @@ const STATUS_BADGE: Record<QuestionStatus, string | null> = {
   now: '🎤 いま回答中',
   later: '⏳ あとで',
   offline: '📮 後日回答',
+  done: '✅ 回答済み',
 };
 
 /** 質問一覧の最大表示件数 */
