@@ -18,6 +18,87 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// ── イベントログ（サーバー内部型。shared には置かない） ──────────────
+/** イベントログの1行。CSV エクスポートの元データ。 */
+interface LogEntry {
+  /** 発生時刻 (epoch ms) */
+  at: number;
+  /** 種別（例: 参加 / リアクション / コメント / SE / 投票 …） */
+  type: string;
+  /** 内容（種別ごとに意味が変わる） */
+  content: string;
+  /** 表示名（コメントのみ入りうる） */
+  displayName?: string;
+}
+
+/** 1イベントあたりのログ上限。超えたら新規追加を無視する。 */
+const LOG_LIMIT = 50_000;
+
+/** eventId → ログ配列 */
+const eventLogs = new Map<string, LogEntry[]>();
+
+/** ログを1行追記する。上限を超えていたら黙って無視する。 */
+function appendLog(eventId: string, entry: LogEntry): void {
+  let log = eventLogs.get(eventId);
+  if (!log) {
+    log = [];
+    eventLogs.set(eventId, log);
+  }
+  if (log.length >= LOG_LIMIT) return;
+  log.push(entry);
+}
+
+// ── CSV ヘルパー ────────────────────────────────────────────────
+/** epoch ms を JST(UTC+9) の `YYYY-MM-DD HH:MM:SS` に整形する（実行環境のTZに依存しない）。 */
+function formatJst(at: number): string {
+  const d = new Date(at + 9 * 60 * 60 * 1000); // UTC+9 を明示的に加算し UTC ゲッターで読む
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  return (
+    `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ` +
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+  );
+}
+
+/** CSV の1フィールドをエスケープする。カンマ・引用符・改行を含む場合は "" で囲む。 */
+function csvField(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+// ── CSV エクスポートエンドポイント ──────────────────────────────
+// ログが空でもヘッダー行だけ返す（404 にしない）。Excel 対策で UTF-8 BOM 付き。
+app.get('/events/:eventId/export.csv', (req, res) => {
+  const eventId = req.params.eventId;
+  const log = eventLogs.get(eventId) ?? [];
+
+  const header = '日時,種別,内容,表示名';
+  const lines = log.map((e) =>
+    [
+      csvField(formatJst(e.at)),
+      csvField(e.type),
+      csvField(e.content),
+      csvField(e.displayName ?? ''),
+    ].join(','),
+  );
+  // 先頭に UTF-8 BOM、改行は CRLF
+  const body = '﻿' + [header, ...lines].join('\r\n') + '\r\n';
+
+  // ファイル名: ASCII セーフ版を filename に、原文（日本語可）を RFC 5987 の filename* に
+  const yyyymmdd = formatJst(Date.now()).slice(0, 10).replace(/-/g, '');
+  const asciiSafeId = eventId.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  const asciiName = `sparkplug-${asciiSafeId}-${yyyymmdd}.csv`;
+  const utf8Name = encodeURIComponent(`sparkplug-${eventId}-${yyyymmdd}.csv`);
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`,
+  );
+  res.send(body);
+});
+
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: CORS_ORIGIN },
@@ -64,6 +145,7 @@ io.on('connection', (socket) => {
       socket.emit('poll', active.poll);
       socket.emit('pollResults', active.poll.id, countsOf(active), active.voters.size);
     }
+    appendLog(eventId, { at: Date.now(), type: '参加', content: role });
     console.log(`[join] event=${eventId} role=${role} socket=${socket.id}`);
   });
 
@@ -88,6 +170,12 @@ io.on('connection', (socket) => {
     activePolls.set(joinedEventId, active);
     io.to(roomOf(joinedEventId)).emit('poll', active.poll);
     emitResults(joinedEventId, active);
+    // content: `質問: 選択肢1 / 選択肢2 / ...`
+    appendLog(joinedEventId, {
+      at: active.poll.at,
+      type: 'アンケート開始',
+      content: `${q}: ${opts.join(' / ')}`,
+    });
   });
 
   socket.on('vote', (pollId, optionIndex) => {
@@ -97,6 +185,12 @@ io.on('connection', (socket) => {
     if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= active.poll.options.length) return;
     active.voters.set(socket.id, optionIndex);
     emitResults(joinedEventId, active);
+    // 投票し直しも1行ずつそのまま記録。content は選ばれた選択肢のラベル
+    appendLog(joinedEventId, {
+      at: Date.now(),
+      type: '投票',
+      content: active.poll.options[optionIndex],
+    });
   });
 
   socket.on('closePoll', () => {
@@ -106,6 +200,14 @@ io.on('connection', (socket) => {
     active.poll.isOpen = false;
     emitResults(joinedEventId, active);
     io.to(roomOf(joinedEventId)).emit('pollClosed', active.poll.id);
+    // content: `質問: 選択肢1=3票 / 選択肢2=1票` の最終集計
+    const counts = countsOf(active);
+    const summary = active.poll.options.map((o, i) => `${o}=${counts[i]}票`).join(' / ');
+    appendLog(joinedEventId, {
+      at: Date.now(),
+      type: 'アンケート締切',
+      content: `${active.poll.question}: ${summary}`,
+    });
   });
 
   socket.on('reaction', (kind) => {
@@ -115,6 +217,7 @@ io.on('connection', (socket) => {
       eventId: joinedEventId,
       at: Date.now(),
     });
+    appendLog(joinedEventId, { at: Date.now(), type: 'リアクション', content: kind });
   });
 
   socket.on('comment', (body, displayName) => {
@@ -128,6 +231,12 @@ io.on('connection', (socket) => {
       displayName,
       at: Date.now(),
     });
+    appendLog(joinedEventId, {
+      at: Date.now(),
+      type: 'コメント',
+      content: trimmed,
+      displayName: displayName ?? '',
+    });
   });
 
   socket.on('se', (kind) => {
@@ -140,6 +249,8 @@ io.on('connection', (socket) => {
       eventId: joinedEventId,
       at: now,
     });
+    // スロットルを通過したものだけ記録する
+    appendLog(joinedEventId, { at: now, type: 'SE', content: kind });
   });
 
   socket.on('disconnect', async () => {
