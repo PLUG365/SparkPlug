@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
+import { SERVER_URL } from '../lib/socket';
 
 const MAX_OPTIONS = 6;
 
@@ -26,9 +27,23 @@ export default function Host() {
     <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <h1 style={{ fontSize: '1.4rem' }}>🎛️ ホスト｜{eventId}</h1>
-        <span style={{ fontSize: '0.9rem', color: '#666' }}>
-          {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
-        </span>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline' }}>
+          <span style={{ fontSize: '0.9rem', color: '#666' }}>
+            {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
+          </span>
+          {/* イベントログを CSV でダウンロード（Excel 対応・BOM 付き） */}
+          <a
+            href={`${SERVER_URL}/events/${encodeURIComponent(eventId ?? '')}/export.csv`}
+            download
+            style={{
+              fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none',
+              padding: '0.25rem 0.7rem', borderRadius: 8,
+              border: '2px solid #cddc29', color: '#d0342c', whiteSpace: 'nowrap',
+            }}
+          >
+            📥 ログCSV
+          </a>
+        </div>
       </header>
 
       <section aria-label="アンケート作成" style={{ margin: '1.5rem 0', padding: '1rem', border: '2px solid #cddc29', borderRadius: 12 }}>
