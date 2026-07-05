@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ChatComment, Reaction, ReactionKind, Se, SeKind } from '@sparkplug/shared';
+import type { ChatComment, Question, Reaction, ReactionKind, Se, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
 import { sePlayer } from '../lib/sound';
@@ -14,6 +14,7 @@ const SE_LABEL: Record<SeKind, string> = {
 };
 
 type FlyingComment = ChatComment & { top: number };
+type FlyingQuestion = Question & { top: number };
 type FloatingReaction = Reaction & { uid: string; left: number };
 type SePop = { uid: string; label: string; left: number; top: number };
 
@@ -21,6 +22,7 @@ export default function Screen() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'screen');
   const [comments, setComments] = useState<FlyingComment[]>([]);
+  const [questions, setQuestions] = useState<FlyingQuestion[]>([]);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [sePops, setSePops] = useState<SePop[]>([]);
   const [soundOn, setSoundOn] = useState(false);
@@ -42,6 +44,11 @@ export default function Screen() {
       setComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 60 }]);
       setTimeout(() => setComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
     };
+    const onQuestion = (q: Question) => {
+      // 質問は通常コメントよりゆっくり流す（18秒）
+      setQuestions((prev) => [...prev, { ...q, top: 5 + Math.random() * 60 }]);
+      setTimeout(() => setQuestions((prev) => prev.filter((x) => x.id !== q.id)), 18000);
+    };
     const onReaction = (r: Reaction) => {
       const uid = crypto.randomUUID();
       setReactions((prev) => [...prev, { ...r, uid, left: 5 + Math.random() * 90 }]);
@@ -57,10 +64,12 @@ export default function Screen() {
       setTimeout(() => setSePops((prev) => prev.filter((x) => x.uid !== uid)), 1500);
     };
     socket.on('comment', onComment);
+    socket.on('question', onQuestion);
     socket.on('reaction', onReaction);
     socket.on('se', onSe);
     return () => {
       socket.off('comment', onComment);
+      socket.off('question', onQuestion);
       socket.off('reaction', onReaction);
       socket.off('se', onSe);
     };
@@ -89,6 +98,24 @@ export default function Screen() {
         >
           {c.body}
           {c.displayName && <span style={{ fontSize: '1rem', color: '#cddc29', marginLeft: 8 }}>@{c.displayName}</span>}
+        </div>
+      ))}
+
+      {questions.map((q) => (
+        <div
+          key={q.id}
+          style={{
+            position: 'absolute', top: `${q.top}%`, left: 0, whiteSpace: 'nowrap',
+            fontSize: '2.2rem', fontWeight: 700, textShadow: '0 0 6px #000',
+            // 通常コメントよりゆっくり（18秒）＋枠付きボックスで質問だと明示
+            animation: 'flyLeft 18s linear forwards', willChange: 'transform',
+            border: '3px solid #f5c400', background: 'rgba(0,0,0,0.7)',
+            borderRadius: 12, padding: '0.4rem 1rem',
+          }}
+        >
+          <span style={{ marginRight: 8 }}>❓</span>
+          {q.body}
+          <span style={{ fontSize: '1rem', color: '#f5c400', marginLeft: 8 }}>@{q.displayName}</span>
         </div>
       ))}
 

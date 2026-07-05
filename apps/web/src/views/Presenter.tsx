@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ChatComment } from '@sparkplug/shared';
+import type { Question } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 
 // ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
@@ -26,8 +26,8 @@ const VIBRATE_MS = 200;
 /** 連続発火を防ぐクールダウン（ms） */
 const VIBRATE_COOLDOWN_MS = 10_000;
 
-/** バックチャンネルの保持上限 */
-const BACKCHANNEL_LIMIT = 50;
+/** 質問の保持上限 */
+const QUESTION_LIMIT = 50;
 
 /** epoch ms を HH:MM に整形（表示用・ローカルTZ） */
 function hhmm(at: number): string {
@@ -54,7 +54,7 @@ export default function Presenter() {
   // リアクションの受信時刻を貯める（描画は別途 1 秒ごとに再計算）
   const reactionTimesRef = useRef<number[]>([]);
   const [commentCount, setCommentCount] = useState(0);
-  const [backchannel, setBackchannel] = useState<ChatComment[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const lastVibrateRef = useRef(0);
   // 1 秒ごとに再描画するための tick
   const [, setTick] = useState(0);
@@ -66,16 +66,16 @@ export default function Presenter() {
       reactionTimesRef.current.push(Date.now());
     };
     const onComment = () => setCommentCount((c) => c + 1);
-    const onBackchannel = (comment: ChatComment) => {
-      setBackchannel((prev) => [comment, ...prev].slice(0, BACKCHANNEL_LIMIT));
+    const onQuestion = (question: Question) => {
+      setQuestions((prev) => [question, ...prev].slice(0, QUESTION_LIMIT));
     };
     socket.on('reaction', onReaction);
     socket.on('comment', onComment);
-    socket.on('backchannel', onBackchannel);
+    socket.on('question', onQuestion);
     return () => {
       socket.off('reaction', onReaction);
       socket.off('comment', onComment);
-      socket.off('backchannel', onBackchannel);
+      socket.off('question', onQuestion);
     };
   }, [socket]);
 
@@ -184,29 +184,32 @@ export default function Presenter() {
         </p>
       </section>
 
-      {/* ── バックチャンネル ───────────────────────────── */}
-      <section aria-label="バックチャンネル">
-        <h2 style={{ fontSize: '1.05rem', marginBottom: 8 }}>バックチャンネル 🎤</h2>
-        {backchannel.length === 0 ? (
+      {/* ── 質問 ───────────────────────────── */}
+      <section aria-label="質問">
+        <h2 style={{ fontSize: '1.05rem', marginBottom: 8 }}>❓ 質問</h2>
+        {questions.length === 0 ? (
           <p style={{ fontSize: '0.85rem', color: '#aaa', padding: '0.8rem 0' }}>
-            参加者からの連絡はここに届きます（例: マイクの音が小さいです）
+            参加者からの質問はここに届きます
           </p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {backchannel.map((c, i) => (
+            {questions.map((q, i) => (
               <li
-                key={c.id}
+                key={q.id}
                 style={{
                   padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
                   background: '#fafafa',
-                  // 先頭（最新）は赤ボーダーで新着を強調
-                  border: i === 0 ? '2px solid #d0342c' : '1px solid #eee',
+                  // 先頭（最新）は黄色ボーダーで新着を強調
+                  border: i === 0 ? '2px solid #f5c400' : '1px solid #eee',
                 }}
               >
                 <span style={{ fontSize: '0.75rem', color: '#aaa', marginRight: 8 }}>
-                  {hhmm(c.at)}
+                  {hhmm(q.at)}
                 </span>
-                {c.body}
+                <span style={{ color: '#d0342c', fontWeight: 600, marginRight: 8 }}>
+                  {q.displayName}
+                </span>
+                {q.body}
               </li>
             ))}
           </ul>

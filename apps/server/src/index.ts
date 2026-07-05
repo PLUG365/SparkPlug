@@ -108,7 +108,7 @@ function roomOf(eventId: string): string {
   return `event:${eventId}`;
 }
 
-/** ロール別ルーム名。バックチャンネルのように特定ロールにだけ配信したいとき使う */
+/** ロール別ルーム名。質問のように特定ロールにだけ配信したいとき使う */
 function roleRoomOf(eventId: string, role: Role): string {
   return `event:${eventId}:role:${role}`;
 }
@@ -142,7 +142,7 @@ io.on('connection', (socket) => {
     joinedEventId = eventId;
     joinedRole = role;
     await socket.join(roomOf(eventId));
-    // ロール別ルームにも join（バックチャンネルの宛先絞り込みに使う）
+    // ロール別ルームにも join（質問の宛先絞り込みに使う）
     await socket.join(roleRoomOf(eventId, role));
     const count = (await io.in(roomOf(eventId)).fetchSockets()).length;
     socket.emit('joined', { eventId, participantCount: count });
@@ -246,21 +246,28 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('backchannel', (body) => {
+  socket.on('question', (body, displayName) => {
     if (!joinedEventId) return;
-    const trimmed = body.trim().slice(0, 200);
-    if (!trimmed) return;
-    // presenter ロールのルームにだけ配信する（表示名は付けない＝匿名）
-    io.to(roleRoomOf(joinedEventId, 'presenter')).emit('backchannel', {
+    const trimmedBody = body.trim().slice(0, 200);
+    const trimmedName = displayName.trim().slice(0, 20);
+    // 本文・表示名のどちらかが空なら無視（質問には表示名が必須）
+    if (!trimmedBody || !trimmedName) return;
+    const question = {
       id: randomUUID(),
       eventId: joinedEventId,
-      body: trimmed,
+      body: trimmedBody,
+      displayName: trimmedName,
       at: Date.now(),
-    });
+    };
+    // presenter / screen / host のロール別ルームに配信（audience には届かない）
+    for (const role of ['presenter', 'screen', 'host'] as const) {
+      io.to(roleRoomOf(joinedEventId, role)).emit('question', question);
+    }
     appendLog(joinedEventId, {
-      at: Date.now(),
-      type: 'バックチャンネル',
-      content: trimmed,
+      at: question.at,
+      type: '質問',
+      content: trimmedBody,
+      displayName: trimmedName,
     });
   });
 
