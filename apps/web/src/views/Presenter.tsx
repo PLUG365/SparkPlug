@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Question } from '@sparkplug/shared';
+import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+import { useQuestions } from '../lib/useQuestions';
+import QuestionTriage from '../components/QuestionTriage';
 
 // ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
 /** 棒グラフの対象窓（秒）と 1 バケットの幅（秒） → 60 本 */
@@ -32,16 +34,6 @@ const VIBRATE_MS = 200;
 /** 連続発火を防ぐクールダウン（ms） */
 const VIBRATE_COOLDOWN_MS = 10_000;
 
-/** 質問の保持上限 */
-const QUESTION_LIMIT = 50;
-
-/** epoch ms を HH:MM に整形（表示用・ローカルTZ） */
-function hhmm(at: number): string {
-  const d = new Date(at);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 /** 熱量ポイントの1イベント（受信時刻と重み） */
 interface HeatEvent {
   at: number;
@@ -62,11 +54,11 @@ function pointsWithin(events: HeatEvent[], now: number, sec: number): number {
 export default function Presenter() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'presenter');
+  const questions = useQuestions(socket);
 
   // 熱量イベント（リアクション/SE/コメント/質問）を重み付きで貯める（描画は別途 1 秒ごとに再計算）
   const heatEventsRef = useRef<HeatEvent[]>([]);
   const [commentCount, setCommentCount] = useState(0);
-  const [questions, setQuestions] = useState<Question[]>([]);
   const lastVibrateRef = useRef(0);
   // 1 秒ごとに再描画するための tick
   const [, setTick] = useState(0);
@@ -81,10 +73,8 @@ export default function Presenter() {
       setCommentCount((c) => c + 1);
       addHeat(WEIGHTS.comment);
     };
-    const onQuestion = (question: Question) => {
-      setQuestions((prev) => [question, ...prev].slice(0, QUESTION_LIMIT));
-      addHeat(WEIGHTS.question);
-    };
+    // 質問リストは useQuestions が購読する。ここでは熱量ポイントだけ加算
+    const onQuestion = () => addHeat(WEIGHTS.question);
     socket.on('reaction', onReaction);
     socket.on('se', onSe);
     socket.on('comment', onComment);
@@ -146,6 +136,10 @@ export default function Presenter() {
   const heatCount = pointsWithin(events, now, HEAT_WINDOW_SEC);
   const heat = HEAT_LEVELS.find((l) => heatCount >= l.min) ?? HEAT_LEVELS[HEAT_LEVELS.length - 1];
 
+  const triage = (questionId: string, status: QuestionStatus) => {
+    socket?.emit('triageQuestion', questionId, status);
+  };
+
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -202,36 +196,10 @@ export default function Presenter() {
         </p>
       </section>
 
-      {/* ── 質問 ───────────────────────────── */}
+      {/* ── 質問トリアージ ───────────────────────────── */}
       <section aria-label="質問">
         <h2 style={{ fontSize: '1.05rem', marginBottom: 8 }}>❓ 質問</h2>
-        {questions.length === 0 ? (
-          <p style={{ fontSize: '0.85rem', color: '#aaa', padding: '0.8rem 0' }}>
-            参加者からの質問はここに届きます
-          </p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {questions.map((q, i) => (
-              <li
-                key={q.id}
-                style={{
-                  padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
-                  background: '#fafafa',
-                  // 先頭（最新）は黄色ボーダーで新着を強調
-                  border: i === 0 ? '2px solid #f5c400' : '1px solid #eee',
-                }}
-              >
-                <span style={{ fontSize: '0.75rem', color: '#aaa', marginRight: 8 }}>
-                  {hhmm(q.at)}
-                </span>
-                <span style={{ color: '#d0342c', fontWeight: 600, marginRight: 8 }}>
-                  {q.displayName}
-                </span>
-                {q.body}
-              </li>
-            ))}
-          </ul>
-        )}
+        <QuestionTriage questions={questions} onTriage={triage} />
       </section>
     </main>
   );

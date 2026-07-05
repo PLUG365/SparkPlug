@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
+import { useQuestions } from '../lib/useQuestions';
+import QuestionTriage from '../components/QuestionTriage';
 import { SERVER_URL } from '../lib/socket';
 
 const MAX_OPTIONS = 6;
@@ -10,8 +13,13 @@ export default function Host() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'host');
   const { poll, counts, total } = usePoll(socket);
+  const questions = useQuestions(socket);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+
+  const triage = (questionId: string, status: QuestionStatus) => {
+    socket?.emit('triageQuestion', questionId, status);
+  };
 
   const filled = options.map((o) => o.trim()).filter(Boolean);
   const canCreate = connected && question.trim() && filled.length >= 2;
@@ -117,6 +125,12 @@ export default function Host() {
           })}
         </section>
       )}
+
+      {/* ── 質問トリアージ ───────────────────────────── */}
+      <section aria-label="質問" style={{ marginTop: '1.5rem' }}>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: 8 }}>❓ 質問</h2>
+        <QuestionTriage questions={questions} onTriage={triage} />
+      </section>
     </main>
   );
 }
