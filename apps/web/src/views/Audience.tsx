@@ -180,6 +180,8 @@ export default function Audience() {
             // 質問モードでは表示名入力欄を黄色ボーダーで必須と明示
             border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
             borderRadius: 4,
+            // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
+            fontSize: 16,
           }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
@@ -194,6 +196,8 @@ export default function Audience() {
               // 質問モードでは黄色ボーダーで「質問として送る」状態を明示
               border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
               borderRadius: 4,
+              // iOS Safari はフォーカス時 font-size が16px未満だと自動ズームするため明示指定
+              fontSize: 16,
             }}
           />
           <button
