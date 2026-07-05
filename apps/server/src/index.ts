@@ -108,6 +108,11 @@ function roomOf(eventId: string): string {
   return `event:${eventId}`;
 }
 
+/** ロール別ルーム名。バックチャンネルのように特定ロールにだけ配信したいとき使う */
+function roleRoomOf(eventId: string, role: Role): string {
+  return `event:${eventId}:role:${role}`;
+}
+
 interface ActivePoll {
   poll: Poll;
   /** socket.id → 選んだ選択肢 index。投票し直しは上書き */
@@ -137,6 +142,8 @@ io.on('connection', (socket) => {
     joinedEventId = eventId;
     joinedRole = role;
     await socket.join(roomOf(eventId));
+    // ロール別ルームにも join（バックチャンネルの宛先絞り込みに使う）
+    await socket.join(roleRoomOf(eventId, role));
     const count = (await io.in(roomOf(eventId)).fetchSockets()).length;
     socket.emit('joined', { eventId, participantCount: count });
     io.to(roomOf(eventId)).emit('participantCount', count);
@@ -236,6 +243,24 @@ io.on('connection', (socket) => {
       type: 'コメント',
       content: trimmed,
       displayName: displayName ?? '',
+    });
+  });
+
+  socket.on('backchannel', (body) => {
+    if (!joinedEventId) return;
+    const trimmed = body.trim().slice(0, 200);
+    if (!trimmed) return;
+    // presenter ロールのルームにだけ配信する（表示名は付けない＝匿名）
+    io.to(roleRoomOf(joinedEventId, 'presenter')).emit('backchannel', {
+      id: randomUUID(),
+      eventId: joinedEventId,
+      body: trimmed,
+      at: Date.now(),
+    });
+    appendLog(joinedEventId, {
+      at: Date.now(),
+      type: 'バックチャンネル',
+      content: trimmed,
     });
   });
 

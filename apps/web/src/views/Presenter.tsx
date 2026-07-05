@@ -1,12 +1,217 @@
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import type { ChatComment } from '@sparkplug/shared';
+import { useEvent } from '../lib/useEvent';
+
+// ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
+/** 棒グラフの対象窓（秒）と 1 バケットの幅（秒） → 12 本 */
+const METER_WINDOW_SEC = 60;
+const BUCKET_SEC = 5;
+const BUCKET_COUNT = METER_WINDOW_SEC / BUCKET_SEC; // 12
+
+/** 「熱量」判定に使う直近窓（秒） */
+const HEAT_WINDOW_SEC = 10;
+/** 熱量の段階しきい値（直近 HEAT_WINDOW_SEC 秒のリアクション数）。上から順に判定 */
+const HEAT_LEVELS: { min: number; emoji: string; label: string }[] = [
+  { min: 15, emoji: '🌋', label: '大噴火' },
+  { min: 5, emoji: '🔥', label: 'アツい' },
+  { min: 1, emoji: '🙂', label: 'ぼちぼち' },
+  { min: 0, emoji: '😴', label: '静か' },
+];
+
+/** バイブレーション: 直近 VIBRATE_WINDOW_SEC 秒で VIBRATE_THRESHOLD 件超えたら振動 */
+const VIBRATE_WINDOW_SEC = 5;
+const VIBRATE_THRESHOLD = 5;
+const VIBRATE_MS = 200;
+/** 連続発火を防ぐクールダウン（ms） */
+const VIBRATE_COOLDOWN_MS = 10_000;
+
+/** バックチャンネルの保持上限 */
+const BACKCHANNEL_LIMIT = 50;
+
+/** epoch ms を HH:MM に整形（表示用・ローカルTZ） */
+function hhmm(at: number): string {
+  const d = new Date(at);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** 直近 sec 秒に含まれるタイムスタンプ数を数える */
+function countWithin(times: number[], now: number, sec: number): number {
+  const from = now - sec * 1000;
+  let n = 0;
+  for (let i = times.length - 1; i >= 0; i--) {
+    if (times[i] >= from) n++;
+    else break; // 昇順前提。古いものに達したら打ち切り
+  }
+  return n;
+}
 
 export default function Presenter() {
   const { eventId } = useParams();
+  const { socket, connected, participantCount } = useEvent(eventId, 'presenter');
+
+  // リアクションの受信時刻を貯める（描画は別途 1 秒ごとに再計算）
+  const reactionTimesRef = useRef<number[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
+  const [backchannel, setBackchannel] = useState<ChatComment[]>([]);
+  const lastVibrateRef = useRef(0);
+  // 1 秒ごとに再描画するための tick
+  const [, setTick] = useState(0);
+
+  // ── socket 購読 ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const onReaction = () => {
+      reactionTimesRef.current.push(Date.now());
+    };
+    const onComment = () => setCommentCount((c) => c + 1);
+    const onBackchannel = (comment: ChatComment) => {
+      setBackchannel((prev) => [comment, ...prev].slice(0, BACKCHANNEL_LIMIT));
+    };
+    socket.on('reaction', onReaction);
+    socket.on('comment', onComment);
+    socket.on('backchannel', onBackchannel);
+    return () => {
+      socket.off('reaction', onReaction);
+      socket.off('comment', onComment);
+      socket.off('backchannel', onBackchannel);
+    };
+  }, [socket]);
+
+  // ── 1 秒ごとに再描画＋古いリアクションを間引く＋バイブ判定 ──────
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      // 窓の外に出た古い時刻を捨てる（配列が無限に伸びないように）
+      const cutoff = now - METER_WINDOW_SEC * 1000;
+      const times = reactionTimesRef.current;
+      let drop = 0;
+      while (drop < times.length && times[drop] < cutoff) drop++;
+      if (drop > 0) times.splice(0, drop);
+
+      // バイブレーション判定（クールダウン付き・非対応環境では何もしない）
+      const recent = countWithin(times, now, VIBRATE_WINDOW_SEC);
+      if (
+        recent > VIBRATE_THRESHOLD &&
+        now - lastVibrateRef.current >= VIBRATE_COOLDOWN_MS
+      ) {
+        navigator.vibrate?.(VIBRATE_MS);
+        lastVibrateRef.current = now;
+      }
+
+      setTick((t) => t + 1); // 再描画トリガー
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ── 描画用の集計（毎レンダー計算・軽いので問題なし） ───────────
+  const now = Date.now();
+  const times = reactionTimesRef.current;
+
+  // 5 秒バケット 12 本。index 0 が最古、末尾が現在
+  const buckets = new Array<number>(BUCKET_COUNT).fill(0);
+  for (const t of times) {
+    const ageSec = (now - t) / 1000;
+    if (ageSec < 0 || ageSec >= METER_WINDOW_SEC) continue;
+    // 新しいものほど右へ
+    const idx = BUCKET_COUNT - 1 - Math.floor(ageSec / BUCKET_SEC);
+    if (idx >= 0 && idx < BUCKET_COUNT) buckets[idx]++;
+  }
+  const maxBucket = Math.max(1, ...buckets);
+
+  // 熱量段階
+  const heatCount = countWithin(times, now, HEAT_WINDOW_SEC);
+  const heat = HEAT_LEVELS.find((l) => heatCount >= l.min) ?? HEAT_LEVELS[HEAT_LEVELS.length - 1];
+
   return (
-    <main style={{ fontFamily: 'sans-serif', padding: '2rem' }}>
-      <h1>🎤 発表者ビュー</h1>
-      <p>イベント: {eventId}</p>
-      <p>TODO: エモメーター / バックチャンネル / 質問トリアージ</p>
+    <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h1 style={{ fontSize: '1.3rem' }}>🎤 発表者ビュー {eventId}</h1>
+        <span style={{ fontSize: '0.85rem', color: '#666' }}>
+          {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
+        </span>
+      </header>
+
+      {/* ── エモメーター ─────────────────────────────── */}
+      <section aria-label="エモメーター" style={{ margin: '1.5rem 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <h2 style={{ fontSize: '1.05rem', margin: 0 }}>エモメーター</h2>
+          <span style={{ fontSize: '0.85rem', color: '#888' }}>💬 {commentCount}</span>
+        </div>
+
+        {/* 現在の熱量 */}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '0.6rem 0.9rem', borderRadius: 12,
+            border: '2px solid #cddc29', background: '#fbfde6', marginBottom: 12,
+          }}
+        >
+          <span style={{ fontSize: '2.2rem', lineHeight: 1 }}>{heat.emoji}</span>
+          <div>
+            <div style={{ fontWeight: 600 }}>{heat.label}</div>
+            <div style={{ fontSize: '0.8rem', color: '#888' }}>
+              直近{HEAT_WINDOW_SEC}秒で {heatCount} リアクション
+            </div>
+          </div>
+        </div>
+
+        {/* 5 秒バケット 12 本の棒グラフ（右端が現在） */}
+        <div
+          style={{
+            display: 'flex', alignItems: 'flex-end', gap: 3, height: 80,
+            padding: '0 2px', borderBottom: '1px solid #eee',
+          }}
+        >
+          {buckets.map((v, i) => (
+            <div
+              key={i}
+              title={`${v} 件`}
+              style={{
+                flex: 1,
+                height: `${Math.round((v / maxBucket) * 100)}%`,
+                minHeight: v > 0 ? 3 : 0,
+                background: i === BUCKET_COUNT - 1 ? '#d0342c' : '#cddc29',
+                borderRadius: '3px 3px 0 0',
+                transition: 'height 0.3s ease',
+              }}
+            />
+          ))}
+        </div>
+        <p style={{ fontSize: '0.75rem', color: '#aaa', margin: '4px 0 0', textAlign: 'right' }}>
+          直近{METER_WINDOW_SEC}秒（{BUCKET_SEC}秒ごと）→ 現在
+        </p>
+      </section>
+
+      {/* ── バックチャンネル ───────────────────────────── */}
+      <section aria-label="バックチャンネル">
+        <h2 style={{ fontSize: '1.05rem', marginBottom: 8 }}>バックチャンネル 🎤</h2>
+        {backchannel.length === 0 ? (
+          <p style={{ fontSize: '0.85rem', color: '#aaa', padding: '0.8rem 0' }}>
+            参加者からの連絡はここに届きます（例: マイクの音が小さいです）
+          </p>
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {backchannel.map((c, i) => (
+              <li
+                key={c.id}
+                style={{
+                  padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
+                  background: '#fafafa',
+                  // 先頭（最新）は赤ボーダーで新着を強調
+                  border: i === 0 ? '2px solid #d0342c' : '1px solid #eee',
+                }}
+              >
+                <span style={{ fontSize: '0.75rem', color: '#aaa', marginRight: 8 }}>
+                  {hhmm(c.at)}
+                </span>
+                {c.body}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }
