@@ -8,7 +8,7 @@ import { sePlayer } from '../lib/sound';
 import { BRAND, pillBadgeStyle } from '../lib/theme';
 
 const EMOJI: Record<ReactionKind, string> = {
-  clap: '👏', laugh: '😆', heart: '❤️', surprise: '😲',
+  like: '👍', laugh: '😆', heart: '❤️', surprise: '😲',
 };
 
 const SE_LABEL: Record<SeKind, string> = {

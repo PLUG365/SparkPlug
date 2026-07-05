@@ -25,7 +25,7 @@ const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
 ];
 
 const REACTIONS: { kind: ReactionKind; emoji: string; label: string }[] = [
-  { kind: 'clap', emoji: '👏', label: '拍手' },
+  { kind: 'like', emoji: '👍', label: 'いいね' },
   { kind: 'laugh', emoji: '😆', label: 'ウケる' },
   { kind: 'heart', emoji: '❤️', label: 'すき' },
   { kind: 'surprise', emoji: '😲', label: 'えっ' },

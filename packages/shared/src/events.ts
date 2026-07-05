@@ -2,7 +2,7 @@
 export type Role = 'host' | 'presenter' | 'audience' | 'screen';
 
 /** 参加者が送るリアクションの種類。MVPでは絵文字ベース。 */
-export type ReactionKind = 'clap' | 'laugh' | 'heart' | 'surprise';
+export type ReactionKind = 'like' | 'laugh' | 'heart' | 'surprise';
 
 export interface Reaction {
   kind: ReactionKind;
