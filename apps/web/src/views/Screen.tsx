@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { ChatComment, Question, Reaction, ReactionKind, Se, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
@@ -27,6 +27,10 @@ export default function Screen() {
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [sePops, setSePops] = useState<SePop[]>([]);
   const [soundOn, setSoundOn] = useState(false);
+  // 画面共有（getDisplayMedia）用の状態。videoRef は背景に敷く映像への参照
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
   const { poll, counts, total } = usePoll(socket);
   const [pollVisible, setPollVisible] = useState(false);
   const allQuestions = useQuestions(socket);
@@ -81,8 +85,57 @@ export default function Screen() {
     };
   }, [socket]);
 
+  // アンマウント時（別ルートへ遷移など）に共有中のトラックを止め、
+  // ブラウザの「共有中」インジケータが残らないようにする
+  useEffect(() => {
+    return () => {
+      const stream = videoRef.current?.srcObject as MediaStream | null;
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  // 画面共有を開始。getDisplayMedia はセキュアコンテキスト（localhost / https）でのみ存在する
+  const startShare = async () => {
+    setShareError(null);
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setShareError('この機能は localhost または HTTPS でのみ使えます。会場PCで http://localhost:5173/... を開いてください。');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      // ブラウザ側の「共有を停止」操作を検知して自動的に元に戻す
+      stream.getVideoTracks()[0].addEventListener('ended', () => {
+        setIsSharing(false);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      });
+      setIsSharing(true);
+    } catch (err) {
+      // ユーザーがピッカーをキャンセルした場合(NotAllowedError等)は静かに無視、それ以外はメッセージ表示
+      if (err instanceof DOMException && err.name === 'NotAllowedError') return;
+      setShareError('画面共有を開始できませんでした。');
+    }
+  };
+
+  const stopShare = () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((t) => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsSharing(false);
+  };
+
   return (
     <main style={{ position: 'relative', overflow: 'hidden', background: '#111', color: '#fff', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+      {/* 画面共有の映像を背景に敷く。stream が無ければ黒背景のまま＝従来の見た目 */}
+      {/* main の最初の子なので、以降の絶対配置の演出は DOM順で自然にこの上へ重なる */}
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#111' }}
+      />
+
       <style>{`
         @keyframes flyLeft { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
         @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-40vh); opacity: 0; } }
@@ -203,18 +256,49 @@ export default function Screen() {
         </div>
       )}
 
-      {!soundOn && (
-        <button
-          onClick={() => { sePlayer.enable(); setSoundOn(true); }}
-          style={{
-            position: 'absolute', bottom: 16, left: 24, padding: '0.6rem 1.2rem',
-            borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
-            color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
-          }}
-        >
-          🔊 音を有効にする
-        </button>
-      )}
+      {/* 左下コーナー：音の有効化ボタンと画面共有コントロールを縦に並べる */}
+      <div style={{ position: 'absolute', bottom: 16, left: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+        {!soundOn && (
+          <button
+            onClick={() => { sePlayer.enable(); setSoundOn(true); }}
+            style={{
+              padding: '0.6rem 1.2rem',
+              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
+              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+            }}
+          >
+            🔊 音を有効にする
+          </button>
+        )}
+        {isSharing ? (
+          <button
+            onClick={stopShare}
+            style={{
+              padding: '0.6rem 1.2rem',
+              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
+              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+            }}
+          >
+            ⏹ 共有を終了
+          </button>
+        ) : (
+          <button
+            onClick={startShare}
+            style={{
+              padding: '0.6rem 1.2rem',
+              borderRadius: 8, border: '2px solid #cddc29', background: 'transparent',
+              color: '#cddc29', fontSize: '1rem', cursor: 'pointer',
+            }}
+          >
+            🖥️ 画面を共有
+          </button>
+        )}
+        {shareError && (
+          <div style={{ color: '#ff8080', fontSize: '0.85rem', maxWidth: 360 }}>
+            {shareError}
+          </div>
+        )}
+      </div>
 
       <div style={{ position: 'absolute', bottom: 16, right: 24, fontSize: '0.9rem', color: '#555' }}>
         スマホで参加 → /e/{eventId}
