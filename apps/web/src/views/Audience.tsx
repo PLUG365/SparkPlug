@@ -26,8 +26,8 @@ export default function Audience() {
   const { poll, counts, total } = usePoll(socket);
   const [comment, setComment] = useState('');
   const [name, setName] = useState('');
-  // ON のとき発表者にだけ匿名で送る（backchannel）
-  const [toPresenter, setToPresenter] = useState(false);
+  // ON のとき質問として送る（表示名必須）
+  const [asQuestion, setAsQuestion] = useState(false);
   const [myVote, setMyVote] = useState<{ pollId: string; index: number } | null>(null);
 
   const vote = (index: number) => {
@@ -39,9 +39,11 @@ export default function Audience() {
   const sendComment = () => {
     const body = comment.trim();
     if (!body || !socket) return;
-    if (toPresenter) {
-      // 発表者にだけ届く匿名の連絡。表示名は送らない
-      socket.emit('backchannel', body);
+    if (asQuestion) {
+      // 質問として送る。表示名は必須
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+      socket.emit('question', body, trimmedName);
     } else {
       socket.emit('comment', body, name.trim() || undefined);
     }
@@ -128,25 +130,26 @@ export default function Audience() {
         <label
           style={{
             display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-            fontSize: '0.85rem', color: toPresenter ? '#d0342c' : '#666', cursor: 'pointer',
+            fontSize: '0.85rem', color: asQuestion ? '#f5c400' : '#666', cursor: 'pointer',
           }}
         >
           <input
             type="checkbox"
-            checked={toPresenter}
-            onChange={(e) => setToPresenter(e.target.checked)}
+            checked={asQuestion}
+            onChange={(e) => setAsQuestion(e.target.checked)}
           />
-          🎤 発表者にだけ送る（匿名）
+          ❓ 質問として送信
         </label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="表示名（空なら匿名）"
+          placeholder={asQuestion ? '表示名（質問には必須）' : '表示名（空なら匿名）'}
           maxLength={20}
-          disabled={toPresenter}
           style={{
             width: '100%', padding: '0.5rem', marginBottom: 8, boxSizing: 'border-box',
-            background: toPresenter ? '#f4f4f4' : '#fff',
+            // 質問モードでは表示名入力欄を黄色ボーダーで必須と明示
+            border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
+            borderRadius: 4,
           }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
@@ -154,18 +157,19 @@ export default function Audience() {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendComment()}
-            placeholder={toPresenter ? '発表者への連絡…（例: マイクが小さいです）' : 'コメントを流す…'}
+            placeholder={asQuestion ? '発表者への質問…（例: マイクの音量どうですか？）' : 'コメントを流す…'}
             maxLength={200}
             style={{
               flex: 1, padding: '0.6rem',
-              // ON のとき赤ボーダーで「発表者にだけ送る」状態を明示
-              border: toPresenter ? '2px solid #d0342c' : '1px solid #ccc',
+              // 質問モードでは黄色ボーダーで「質問として送る」状態を明示
+              border: asQuestion ? '2px solid #f5c400' : '1px solid #ccc',
               borderRadius: 4,
             }}
           />
           <button
             onClick={sendComment}
-            disabled={!connected || !comment.trim()}
+            // 質問モードでは表示名が空なら送信不可
+            disabled={!connected || !comment.trim() || (asQuestion && !name.trim())}
             style={{
               padding: '0.6rem 1.2rem', borderRadius: 8, border: 'none',
               background: '#d0342c', color: '#fff', fontWeight: 600, cursor: 'pointer',
