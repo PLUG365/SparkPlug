@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import type { ChatComment, Question, Reaction, ReactionKind, Se, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
+import { useQuestions } from '../lib/useQuestions';
 import { sePlayer } from '../lib/sound';
 
 const EMOJI: Record<ReactionKind, string> = {
@@ -28,6 +29,11 @@ export default function Screen() {
   const [soundOn, setSoundOn] = useState(false);
   const { poll, counts, total } = usePoll(socket);
   const [pollVisible, setPollVisible] = useState(false);
+  const allQuestions = useQuestions(socket);
+  // status='now' の質問を画面下部中央にピン留め。複数あれば最新1件だけ
+  const pinnedQuestion = allQuestions
+    .filter((q) => q.status === 'now')
+    .sort((a, b) => b.at - a.at)[0];
 
   useEffect(() => {
     if (!poll) return;
@@ -172,6 +178,28 @@ export default function Screen() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* status='now' の質問を画面下部中央にピン留め表示 */}
+      {pinnedQuestion && (
+        <div
+          style={{
+            position: 'absolute', bottom: '6%', left: '50%', transform: 'translateX(-50%)',
+            width: 'min(720px, 80vw)', textAlign: 'center',
+            background: 'rgba(0,0,0,0.82)', border: '3px solid #f5c400', borderRadius: 16,
+            padding: '1rem 1.4rem',
+          }}
+        >
+          <div style={{ fontSize: '1rem', color: '#f5c400', fontWeight: 700, marginBottom: 6 }}>
+            🎤 いま答えている質問
+          </div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 700, lineHeight: 1.3 }}>
+            {pinnedQuestion.body}
+          </div>
+          <div style={{ fontSize: '1rem', color: '#cddc29', marginTop: 6 }}>
+            @{pinnedQuestion.displayName}
+          </div>
         </div>
       )}
 

@@ -1,8 +1,20 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { ReactionKind, SeKind } from '@sparkplug/shared';
+import type { QuestionStatus, ReactionKind, SeKind } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
+import { useQuestions } from '../lib/useQuestions';
+
+/** 参加者一覧に出すステータスバッジ（新着はバッジなし） */
+const STATUS_BADGE: Record<QuestionStatus, string | null> = {
+  new: null,
+  now: '🎤 いま回答中',
+  later: '⏳ あとで',
+  offline: '📮 後日回答',
+};
+
+/** 質問一覧の最大表示件数 */
+const QUESTION_DISPLAY_LIMIT = 20;
 
 const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
   { kind: 'don', emoji: '🥁', label: 'ドン' },
@@ -22,11 +34,30 @@ export default function Audience() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'audience');
   const { poll, counts, total } = usePoll(socket);
+  const questions = useQuestions(socket);
   const [comment, setComment] = useState('');
   const [name, setName] = useState('');
   // ON のとき質問として送る（表示名必須）
   const [asQuestion, setAsQuestion] = useState(false);
   const [myVote, setMyVote] = useState<{ pollId: string; index: number } | null>(null);
+  // 自分がいいねした質問 id（ローカル表示用トグル）
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+
+  const toggleLike = (questionId: string) => {
+    if (!socket) return;
+    socket.emit('likeQuestion', questionId);
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      return next;
+    });
+  };
+
+  // いいね降順 → 新しい順。表示は最大 QUESTION_DISPLAY_LIMIT 件
+  const sortedQuestions = [...questions].sort((a, b) => b.likes - a.likes || b.at - a.at);
+  const visibleQuestions = sortedQuestions.slice(0, QUESTION_DISPLAY_LIMIT);
+  const overflowCount = sortedQuestions.length - visibleQuestions.length;
 
   const vote = (index: number) => {
     if (!poll?.isOpen || !socket) return;
@@ -177,6 +208,64 @@ export default function Audience() {
           </button>
         </div>
       </section>
+
+      {/* ── 質問一覧（いいねできる） ─────────────────── */}
+      {questions.length > 0 && (
+        <section aria-label="質問一覧" style={{ marginTop: '1.5rem' }}>
+          <h2 style={{ fontSize: '1.05rem', marginBottom: 8 }}>❓ みんなの質問</h2>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {visibleQuestions.map((q) => {
+              const badge = STATUS_BADGE[q.status];
+              const liked = likedIds.has(q.id);
+              return (
+                <li
+                  key={q.id}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                    padding: '0.6rem 0.8rem', marginBottom: 6, borderRadius: 8,
+                    background: '#fafafa', border: '1px solid #eee',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <span style={{ color: '#d0342c', fontWeight: 600, marginRight: 8 }}>
+                      {q.displayName}
+                    </span>
+                    {badge && (
+                      <span
+                        style={{
+                          fontSize: '0.7rem', color: '#888', border: '1px solid #ddd',
+                          borderRadius: 6, padding: '0.05rem 0.4rem', marginRight: 6,
+                        }}
+                      >
+                        {badge}
+                      </span>
+                    )}
+                    <br />
+                    {q.body}
+                  </div>
+                  <button
+                    onClick={() => toggleLike(q.id)}
+                    disabled={!connected}
+                    style={{
+                      whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '0.3rem 0.6rem',
+                      borderRadius: 8, cursor: 'pointer',
+                      border: liked ? '2px solid #f5c400' : '1px solid #ccc',
+                      background: liked ? '#fffbe6' : '#fff', fontWeight: 600,
+                    }}
+                  >
+                    👍 {q.likes}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {overflowCount > 0 && (
+            <p style={{ fontSize: '0.8rem', color: '#888', margin: '4px 0 0' }}>
+              他{overflowCount}件
+            </p>
+          )}
+        </section>
+      )}
     </main>
   );
 }

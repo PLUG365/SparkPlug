@@ -30,6 +30,9 @@ export interface ChatComment {
   at: number;
 }
 
+/** 質問のトリアージ状態。new=新着 / now=今答える / later=後で / offline=後日回答 */
+export type QuestionStatus = 'new' | 'now' | 'later' | 'offline';
+
 /** 参加者から発表者への質問。表示名は必須 */
 export interface Question {
   id: string;
@@ -38,6 +41,10 @@ export interface Question {
   /** 質問には表示名が必須 */
   displayName: string;
   at: number;
+  /** トリアージ状態。初期値は 'new' */
+  status: QuestionStatus;
+  /** いいね数（1接続1票） */
+  likes: number;
 }
 
 /** 選択式アンケート。イベントごとに同時に1本だけアクティブになる。 */
@@ -62,6 +69,10 @@ export interface ClientToServerEvents {
   comment: (body: string, displayName?: string) => void;
   /** 発表者に届く質問。表示名は必須 */
   question: (body: string, displayName: string) => void;
+  /** 質問へのいいね。1接続1票のトグル */
+  likeQuestion: (questionId: string) => void;
+  /** 質問のトリアージ振り分け。presenter / host のみ */
+  triageQuestion: (questionId: string, status: QuestionStatus) => void;
   se: (kind: SeKind) => void;
   /** host ロールのみ。既存のアクティブなアンケートは自動クローズされる */
   createPoll: (question: string, options: string[]) => void;
@@ -76,8 +87,12 @@ export interface ServerToClientEvents {
   joined: (payload: { eventId: string; participantCount: number }) => void;
   reaction: (reaction: Reaction) => void;
   comment: (comment: ChatComment) => void;
-  /** presenter / screen / host ロールに配信される質問（表示名付き） */
+  /** ルーム全体に配信される質問（表示名付き） */
   question: (question: Question) => void;
+  /** いいね数・ステータス変更の通知 */
+  questionUpdated: (question: Question) => void;
+  /** join 時の質問一覧の一括同期 */
+  questions: (questions: Question[]) => void;
   se: (se: Se) => void;
   participantCount: (count: number) => void;
   /** アンケート開始（途中参加者には join 時に現状が送られる） */

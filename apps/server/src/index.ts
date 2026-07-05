@@ -7,6 +7,8 @@ import type {
   ServerToClientEvents,
   JoinPayload,
   Poll,
+  Question,
+  QuestionStatus,
   Role,
 } from '@sparkplug/shared';
 
@@ -121,6 +123,28 @@ interface ActivePoll {
 
 const activePolls = new Map<string, ActivePoll>();
 
+// ── 質問ストア ──────────────────────────────────────────────────
+/** 質問1件と、いいねした socket.id の集合 */
+interface QuestionRecord {
+  question: Question;
+  /** いいねした socket.id。likes = likedBy.size */
+  likedBy: Set<string>;
+}
+
+/** 1イベントあたりの質問保持上限。超えたら新規質問を無視する。 */
+const QUESTION_LIMIT = 200;
+
+/** eventId → 質問レコード配列（古い順） */
+const eventQuestions = new Map<string, QuestionRecord[]>();
+
+/** triageQuestion のログ用ラベル（offline は「後日」で記録） */
+const TRIAGE_LOG_LABEL: Record<QuestionStatus, string> = {
+  new: '新着',
+  now: '今答える',
+  later: '後で',
+  offline: '後日',
+};
+
 function countsOf(active: ActivePoll): number[] {
   const counts = active.poll.options.map(() => 0);
   for (const idx of active.voters.values()) counts[idx]++;
@@ -151,6 +175,11 @@ io.on('connection', (socket) => {
     if (active) {
       socket.emit('poll', active.poll);
       socket.emit('pollResults', active.poll.id, countsOf(active), active.voters.size);
+    }
+    // その時点の質問一覧を本人にだけ一括同期（アンケート同期と同じパターン）
+    const records = eventQuestions.get(eventId);
+    if (records && records.length > 0) {
+      socket.emit('questions', records.map((r) => r.question));
     }
     appendLog(eventId, { at: Date.now(), type: '参加', content: role });
     console.log(`[join] event=${eventId} role=${role} socket=${socket.id}`);
@@ -252,22 +281,63 @@ io.on('connection', (socket) => {
     const trimmedName = displayName.trim().slice(0, 20);
     // 本文・表示名のどちらかが空なら無視（質問には表示名が必須）
     if (!trimmedBody || !trimmedName) return;
-    const question = {
+    // 質問ストアを確保し、上限を超えていたら新規質問を無視する
+    let records = eventQuestions.get(joinedEventId);
+    if (!records) {
+      records = [];
+      eventQuestions.set(joinedEventId, records);
+    }
+    if (records.length >= QUESTION_LIMIT) return;
+    const question: Question = {
       id: randomUUID(),
       eventId: joinedEventId,
       body: trimmedBody,
       displayName: trimmedName,
       at: Date.now(),
+      status: 'new',
+      likes: 0,
     };
-    // presenter / screen / host のロール別ルームに配信（audience には届かない）
-    for (const role of ['presenter', 'screen', 'host'] as const) {
-      io.to(roleRoomOf(joinedEventId, role)).emit('question', question);
-    }
+    records.push({ question, likedBy: new Set() });
+    // 参加者もいいねのために一覧を見られるよう、ルーム全体に配信する
+    io.to(roomOf(joinedEventId)).emit('question', question);
     appendLog(joinedEventId, {
       at: question.at,
       type: '質問',
       content: trimmedBody,
       displayName: trimmedName,
+    });
+  });
+
+  socket.on('likeQuestion', (questionId) => {
+    if (!joinedEventId) return;
+    const records = eventQuestions.get(joinedEventId);
+    const record = records?.find((r) => r.question.id === questionId);
+    if (!record) return;
+    // トグル: 既に押していれば外す、なければ追加
+    if (record.likedBy.has(socket.id)) {
+      record.likedBy.delete(socket.id);
+    } else {
+      record.likedBy.add(socket.id);
+    }
+    record.question.likes = record.likedBy.size;
+    // いいねはノイズになるため CSV ログには記録しない
+    io.to(roomOf(joinedEventId)).emit('questionUpdated', record.question);
+  });
+
+  socket.on('triageQuestion', (questionId, status) => {
+    // presenter / host のみ振り分け可
+    if (!joinedEventId || (joinedRole !== 'presenter' && joinedRole !== 'host')) return;
+    if (status !== 'new' && status !== 'now' && status !== 'later' && status !== 'offline') return;
+    const records = eventQuestions.get(joinedEventId);
+    const record = records?.find((r) => r.question.id === questionId);
+    if (!record) return;
+    record.question.status = status;
+    io.to(roomOf(joinedEventId)).emit('questionUpdated', record.question);
+    appendLog(joinedEventId, {
+      at: Date.now(),
+      type: '質問振り分け',
+      content: `${record.question.body} → ${TRIAGE_LOG_LABEL[status]}`,
+      displayName: record.question.displayName,
     });
   });
 
