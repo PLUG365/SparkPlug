@@ -4,7 +4,9 @@ import type { ChatComment, Question, Reaction, ReactionKind, Se, SeKind } from '
 import { useEvent } from '../lib/useEvent';
 import { usePoll } from '../lib/usePoll';
 import { useQuestions } from '../lib/useQuestions';
+import { useEventSettings } from '../lib/useEventSettings';
 import { sePlayer } from '../lib/sound';
+import { AUDIENCE_BASE_URL } from '../lib/socket';
 import { BRAND, pillBadgeStyle } from '../lib/theme';
 
 const EMOJI: Record<ReactionKind, string> = {
@@ -33,6 +35,11 @@ export default function Screen() {
   const [shareError, setShareError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const { poll, counts, total } = usePoll(socket);
+  const { qrVisible, soundEnabled } = useEventSettings(socket);
+  // onSe は [socket] 依存の effect 内で購読するため、最新の soundEnabled を ref 経由で参照する
+  // （依存に含めて毎回 re-subscribe すると他のリスナーまで貼り直しになるため）
+  const soundEnabledRef = useRef(soundEnabled);
+  soundEnabledRef.current = soundEnabled;
   const [pollVisible, setPollVisible] = useState(false);
   const allQuestions = useQuestions(socket);
   // status='now' の質問を画面下部中央にピン留め。複数あれば最新1件だけ
@@ -66,7 +73,8 @@ export default function Screen() {
       setTimeout(() => setReactions((prev) => prev.filter((x) => x.uid !== uid)), 3000);
     };
     const onSe = (se: Se) => {
-      sePlayer.play(se.kind);
+      // 音だけをミュート制御する。ポップ演出は soundEnabled に関わらず従来通り表示する
+      if (soundEnabledRef.current) sePlayer.play(se.kind);
       const uid = crypto.randomUUID();
       setSePops((prev) => [...prev, {
         uid, label: SE_LABEL[se.kind],
@@ -305,9 +313,23 @@ export default function Screen() {
         )}
       </div>
 
-      <div style={{ position: 'absolute', bottom: 16, right: 24, fontSize: '0.9rem', color: '#555' }}>
-        スマホで参加 → /e/{eventId}
-      </div>
+      {/* 右下：スマホ参加用QRコード（host からON/OFF可能）。
+          背景に画面共有映像が乗っても読み取れるよう、必ず不透明な白背景の箱に収める */}
+      {qrVisible && (
+        <div style={{
+          position: 'absolute', bottom: 16, right: 24,
+          background: '#fff', borderRadius: 14, padding: '8px 8px 6px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        }}>
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(`${AUDIENCE_BASE_URL}/e/${eventId}`)}`}
+            alt="スマホで参加するQRコード"
+            width={110}
+            height={110}
+          />
+          <span style={{ fontSize: '0.7rem', color: '#1a1a1a', fontWeight: 600 }}>📱 スマホで参加</span>
+        </div>
+      )}
     </main>
   );
 }

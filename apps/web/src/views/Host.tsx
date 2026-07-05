@@ -1,20 +1,31 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 import { usePollList } from '../lib/usePollList';
 import { useQuestions } from '../lib/useQuestions';
+import { useEventSettings } from '../lib/useEventSettings';
 import QuestionTriage from '../components/QuestionTriage';
 import { SERVER_URL } from '../lib/socket';
 import { BRAND, headerBarStyle, pillBadgeStyle, pillButtonStyle } from '../lib/theme';
 
 const MAX_OPTIONS = 6;
 
+/**
+ * スクリーン設定トグル用スタイル。pillButtonStyle をベースに、ON は黄緑・OFF はグレーで
+ * 現在の状態が一目で分かるようにする。未接続時は disabled 見た目に倒す。
+ */
+function screenToggleStyle(on: boolean, connected: boolean): CSSProperties {
+  if (!connected) return pillButtonStyle({ disabled: true });
+  return pillButtonStyle({ color: on ? BRAND.lime : '#999' });
+}
+
 export default function Host() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'host');
   const { polls, resultsByPollId } = usePollList(socket);
   const questions = useQuestions(socket);
+  const { qrVisible, soundEnabled } = useEventSettings(socket);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
 
@@ -59,6 +70,27 @@ export default function Host() {
           </a>
         </div>
       </header>
+
+      {/* ── スクリーン設定（会場スクリーンのQR表示・効果音をホストから制御） ───────── */}
+      <section aria-label="スクリーン設定" style={{ margin: '1.5rem 0', padding: '1rem', border: '3px solid #ddd', borderRadius: 18 }}>
+        <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>📺 スクリーン設定</h2>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            onClick={() => socket?.emit('setQrVisible', !qrVisible)}
+            disabled={!connected}
+            style={screenToggleStyle(qrVisible, connected)}
+          >
+            {qrVisible ? '📱 QR表示中' : '📱 QR非表示'}
+          </button>
+          <button
+            onClick={() => socket?.emit('setSoundEnabled', !soundEnabled)}
+            disabled={!connected}
+            style={screenToggleStyle(soundEnabled, connected)}
+          >
+            {soundEnabled ? '🔊 効果音ON' : '🔇 効果音OFF'}
+          </button>
+        </div>
+      </section>
 
       <section aria-label="アンケート作成" style={{ margin: '1.5rem 0', padding: '1rem', border: `3px solid ${BRAND.lime}`, borderRadius: 18 }}>
         <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>📊 アンケートを作る</h2>

@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
+  EventSettings,
   JoinPayload,
   Poll,
   Question,
@@ -117,6 +118,23 @@ function roleRoomOf(eventId: string, role: Role): string {
   return `event:${eventId}:role:${role}`;
 }
 
+// ── スクリーン設定ストア ────────────────────────────────────────
+/** スクリーン設定の既定値。QRコード表示・効果音とも初期は ON */
+const DEFAULT_EVENT_SETTINGS: EventSettings = { qrVisible: true, soundEnabled: true };
+
+/** eventId → スクリーン設定 */
+const eventSettings = new Map<string, EventSettings>();
+
+/** イベントのスクリーン設定を返す。無ければ既定値で作成して格納する（遅延初期化） */
+function getEventSettings(eventId: string): EventSettings {
+  let settings = eventSettings.get(eventId);
+  if (!settings) {
+    settings = { ...DEFAULT_EVENT_SETTINGS };
+    eventSettings.set(eventId, settings);
+  }
+  return settings;
+}
+
 /** アンケート1件と、投票状況。下書き・実施中・締切済みのすべてを保持する */
 interface PollRecord {
   poll: Poll;
@@ -206,6 +224,8 @@ io.on('connection', (socket) => {
     if (records && records.length > 0) {
       socket.emit('questions', records.map((r) => r.question));
     }
+    // スクリーン設定を本人にだけ同期（全ロール共通。無ければ既定値で作られる）
+    socket.emit('eventSettings', getEventSettings(eventId));
     appendLog(eventId, { at: Date.now(), type: '参加', content: role });
     console.log(`[join] event=${eventId} role=${role} socket=${socket.id}`);
   });
@@ -402,6 +422,20 @@ io.on('connection', (socket) => {
     });
     // スロットルを通過したものだけ記録する
     appendLog(joinedEventId, { at: now, type: 'SE', content: kind });
+  });
+
+  socket.on('setQrVisible', (visible) => {
+    if (!joinedEventId || joinedRole !== 'host') return;
+    getEventSettings(joinedEventId).qrVisible = visible;
+    // トグル操作はノイズになるため CSV ログには記録しない
+    io.to(roomOf(joinedEventId)).emit('eventSettings', getEventSettings(joinedEventId));
+  });
+
+  socket.on('setSoundEnabled', (enabled) => {
+    if (!joinedEventId || joinedRole !== 'host') return;
+    getEventSettings(joinedEventId).soundEnabled = enabled;
+    // トグル操作はノイズになるため CSV ログには記録しない
+    io.to(roomOf(joinedEventId)).emit('eventSettings', getEventSettings(joinedEventId));
   });
 
   socket.on('disconnect', async () => {
