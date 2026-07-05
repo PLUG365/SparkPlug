@@ -8,8 +8,6 @@ const SOUNDS: { kind: SeKind; emoji: string; label: string }[] = [
   { kind: 'don', emoji: '🥁', label: 'ドン' },
   { kind: 'ka', emoji: '🪵', label: 'カッ' },
   { kind: 'clap', emoji: '👏', label: '拍手' },
-  { kind: 'drumroll', emoji: '🌀', label: 'ドラムロール' },
-  { kind: 'fanfare', emoji: '🎺', label: 'ファンファーレ' },
 ];
 
 const REACTIONS: { kind: ReactionKind; emoji: string; label: string }[] = [

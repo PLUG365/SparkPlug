@@ -63,8 +63,6 @@ export class SePlayer {
       case 'don': this.don(ctx, t); break;
       case 'ka': this.ka(ctx, t); break;
       case 'clap': this.clap(ctx, t); break;
-      case 'drumroll': this.drumroll(ctx, t); break;
-      case 'fanfare': this.fanfare(ctx, t); break;
     }
   }
 
@@ -121,38 +119,6 @@ export class SePlayer {
     }
   }
 
-  /** ドラムロール: 加速するスネア連打 */
-  private drumroll(ctx: AudioContext, t: number): void {
-    let at = t;
-    let interval = 0.09;
-    for (let i = 0; i < 20; i++) {
-      this.noiseHit(ctx, at, { seconds: 0.07, filterType: 'bandpass', freq: 700, q: 0.9, gain: 0.4 });
-      at += interval;
-      interval = Math.max(0.035, interval * 0.93);
-    }
-    this.don(ctx, at + 0.05);
-  }
-
-  /** ファンファーレ: パンパカパーン */
-  private fanfare(ctx: AudioContext, t: number): void {
-    const note = (freq: number, at: number, dur: number, gain = 0.25) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(gain, at);
-      g.gain.setValueAtTime(gain, at + dur * 0.7);
-      g.gain.exponentialRampToValueAtTime(0.001, at + dur);
-      osc.connect(g).connect(ctx.destination);
-      osc.start(at);
-      osc.stop(at + dur);
-    };
-    const C5 = 523.25, E5 = 659.25, G5 = 783.99, C6 = 1046.5;
-    note(C5, t, 0.14);
-    note(C5, t + 0.16, 0.1);
-    note(C5, t + 0.28, 0.1);
-    for (const f of [C5, E5, G5, C6]) note(f, t + 0.42, 0.7, 0.18);
-  }
 }
 
 export const sePlayer = new SePlayer();

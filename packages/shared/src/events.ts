@@ -12,8 +12,8 @@ export interface Reaction {
   at: number;
 }
 
-/** SE（効果音）の種類。会場スクリーン側で Web Audio API により合成再生される。 */
-export type SeKind = 'don' | 'ka' | 'clap' | 'drumroll' | 'fanfare';
+/** SE（効果音）の種類。会場スクリーン側で再生される。 */
+export type SeKind = 'don' | 'ka' | 'clap';
 
 export interface Se {
   kind: SeKind;

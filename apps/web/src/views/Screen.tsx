@@ -10,7 +10,7 @@ const EMOJI: Record<ReactionKind, string> = {
 };
 
 const SE_LABEL: Record<SeKind, string> = {
-  don: 'ドン！', ka: 'カッ', clap: '👏👏👏', drumroll: 'ドロロロロ…', fanfare: '🎺 パンパカパーン！',
+  don: 'ドン！', ka: 'カッ', clap: '👏👏👏',
 };
 
 type FlyingComment = ChatComment & { top: number };
