@@ -4,10 +4,10 @@ import type { Question } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
 
 // ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
-/** 棒グラフの対象窓（秒）と 1 バケットの幅（秒） → 12 本 */
+/** 棒グラフの対象窓（秒）と 1 バケットの幅（秒） → 60 本 */
 const METER_WINDOW_SEC = 60;
-const BUCKET_SEC = 5;
-const BUCKET_COUNT = METER_WINDOW_SEC / BUCKET_SEC; // 12
+const BUCKET_SEC = 1;
+const BUCKET_COUNT = METER_WINDOW_SEC / BUCKET_SEC; // 60
 
 /** 「熱量」判定に使う直近窓（秒） */
 const HEAT_WINDOW_SEC = 10;
@@ -160,7 +160,7 @@ export default function Presenter() {
         {/* 5 秒バケット 12 本の棒グラフ（右端が現在） */}
         <div
           style={{
-            display: 'flex', alignItems: 'flex-end', gap: 3, height: 80,
+            display: 'flex', alignItems: 'flex-end', gap: 1, height: 80,
             padding: '0 2px', borderBottom: '1px solid #eee',
           }}
         >
@@ -173,7 +173,7 @@ export default function Presenter() {
                 height: `${Math.round((v / maxBucket) * 100)}%`,
                 minHeight: v > 0 ? 3 : 0,
                 background: i === BUCKET_COUNT - 1 ? '#d0342c' : '#cddc29',
-                borderRadius: '3px 3px 0 0',
+                borderRadius: '1px 1px 0 0',
                 transition: 'height 0.3s ease',
               }}
             />
