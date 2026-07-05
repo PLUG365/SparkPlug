@@ -60,6 +60,12 @@ export interface Poll {
   at: number;
 }
 
+/** イベントごとのスクリーン設定。qrVisible=QRコード表示 / soundEnabled=効果音ミュート制御。共に既定 true */
+export interface EventSettings {
+  qrVisible: boolean;
+  soundEnabled: boolean;
+}
+
 export interface JoinPayload {
   eventId: string;
   role: Role;
@@ -85,6 +91,10 @@ export interface ClientToServerEvents {
   closePoll: (pollId: string) => void;
   /** 投票し直し可（同一接続の最後の投票が有効） */
   vote: (pollId: string, optionIndex: number) => void;
+  /** host ロールのみ。会場スクリーンのQRコード表示をON/OFFする */
+  setQrVisible: (visible: boolean) => void;
+  /** host ロールのみ。会場スクリーンの効果音をON/OFF（ミュート）する */
+  setSoundEnabled: (enabled: boolean) => void;
 }
 
 /** サーバー → クライアント */
@@ -106,4 +116,6 @@ export interface ServerToClientEvents {
   pollClosed: (pollId: string) => void;
   /** 全アンケート一覧（下書き・実施中・締切済み）。host ロールにのみ配信 */
   polls: (polls: Poll[]) => void;
+  /** イベントごとのスクリーン設定。join 時に該当ソケットへ、変更時に room 全体へ配信 */
+  eventSettings: (settings: EventSettings) => void;
 }
