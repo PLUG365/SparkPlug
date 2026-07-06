@@ -22,6 +22,17 @@ type FlyingQuestion = Question & { top: number };
 type FloatingReaction = Reaction & { uid: string; left: number };
 type SePop = { uid: string; label: string; left: number; top: number };
 
+/**
+ * 完全ランダムな top だと同時期に来た複数コメントが同じ高さに重なって流れてしまう。
+ * 固定レーンを順番に使い回すことで、連続で来ても必ず違う高さに振り分ける。
+ * laneRef はコンポーネント側で useRef(0) を渡す（レーンの現在位置を再レンダーを跨いで保持する）。
+ */
+function nextLaneTop(laneRef: { current: number }, laneCount: number, minPct: number, maxPct: number): number {
+  const lane = laneRef.current % laneCount;
+  laneRef.current += 1;
+  return laneCount > 1 ? minPct + ((maxPct - minPct) * lane) / (laneCount - 1) : minPct;
+}
+
 export default function Screen() {
   const { eventId } = useParams();
   const { socket, connected, participantCount } = useEvent(eventId, 'screen');
@@ -43,6 +54,10 @@ export default function Screen() {
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
   const [pollVisible, setPollVisible] = useState(false);
+  // コメント/AA/質問それぞれ専用のレーン割り当てカウンタ（同時期の複数投稿が重ならないように）
+  const commentLaneRef = useRef(0);
+  const asciiLaneRef = useRef(0);
+  const questionLaneRef = useRef(0);
   const allQuestions = useQuestions(socket);
   // status='now' の質問を画面下部中央にピン留め。複数あれば最新1件だけ
   const pinnedQuestion = allQuestions
@@ -62,17 +77,18 @@ export default function Screen() {
     if (!socket) return;
     const onComment = (c: ChatComment) => {
       if (c.isAsciiArt) {
-        // AA は複数行で高さが出るため縦位置を上側(5〜45%)に寄せる。速さは通常コメントと同じ12秒
-        setAsciiComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 40 }]);
+        // AA は複数行で高さが出るため縦位置は上側(5〜45%)の6レーンに割り当て。速さは通常コメントと同じ12秒
+        setAsciiComments((prev) => [...prev, { ...c, top: nextLaneTop(asciiLaneRef, 6, 5, 45) }]);
         setTimeout(() => setAsciiComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
         return;
       }
-      setComments((prev) => [...prev, { ...c, top: 5 + Math.random() * 60 }]);
+      // 10レーンを順番に割り当て、同時期に来ても同じ高さに重ならないようにする
+      setComments((prev) => [...prev, { ...c, top: nextLaneTop(commentLaneRef, 10, 5, 65) }]);
       setTimeout(() => setComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
     };
     const onQuestion = (q: Question) => {
-      // 質問は通常コメントよりゆっくり流す（18秒）
-      setQuestions((prev) => [...prev, { ...q, top: 5 + Math.random() * 60 }]);
+      // 質問は通常コメントよりゆっくり流す（18秒）。専用レーンで重なりを避ける
+      setQuestions((prev) => [...prev, { ...q, top: nextLaneTop(questionLaneRef, 8, 5, 65) }]);
       setTimeout(() => setQuestions((prev) => prev.filter((x) => x.id !== q.id)), 18000);
     };
     const onReaction = (r: Reaction) => {
