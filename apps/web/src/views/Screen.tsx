@@ -189,7 +189,9 @@ export default function Screen() {
           key={c.id}
           style={{
             position: 'absolute', top: `${c.top}%`, left: 0, whiteSpace: 'nowrap',
-            fontSize: '2.2rem', fontWeight: 700, textShadow: '0 0 6px #000',
+            fontSize: '2.2rem', fontWeight: 700,
+            // 白背景（画面共有でスライド等が映っても）で消えないよう、濃い縁取り＋ぼかしを併用
+            textShadow: '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 6px #000',
             animation: 'flyLeft 12s linear forwards', willChange: 'transform',
           }}
         >
