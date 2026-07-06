@@ -11,6 +11,10 @@
     "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:server": "npm run dev -w apps/server",
-    "dev:web": "npm run dev -w apps/web"
+    "dev:web": "npm run dev -w apps/web",
+    "demo:seed": "node scripts/demo-seed.mjs"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.0"
   }
 }

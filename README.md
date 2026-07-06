@@ -82,6 +82,16 @@ VITE_AUDIENCE_URL=http://<PCのLAN IP>:5173
 
 `VITE_AUDIENCE_URL` は会場スクリーンのQRコードに埋め込む参加者URLの基点。スクリーンを画面共有のため `localhost` 経由で開いた場合でも、QRにはスマホから読めるLAN IPが埋め込まれるようにするための設定。
 
+### デモ用の活動を流し込む（スクリーンショット・録画用）
+
+実際に参加者を集めなくても、会場スクリーンにリアクション連打・コメント流し・AA・アンケート（開始→投票→締切）をまとめて流せるスクリプトがある。参加者UIは経由せず `socket.io-client` で直接サーバーに接続する:
+
+```bash
+npm run demo:seed -- <eventId>   # 例: npm run demo:seed -- demo
+```
+
+`dev:server` を起動した状態で、会場スクリーン（`/e/{eventId}/screen`）を開いておいてから実行する。`SERVER_URL` 環境変数でサーバーURLを上書き可能（既定 `http://localhost:3001`）。中身は `scripts/demo-seed.mjs`。
+
 ## Roadmap
 
 - [x] モノレポ雛形（web / server / shared）
