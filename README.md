@@ -47,11 +47,40 @@ packages/
 ```bash
 npm install
 npm run build          # shared → server → web の順にビルド
+```
+
+`dev:server` と `dev:web` は**2つのターミナルで同時に**起動しておく（片方だけだと画面は開けてもリアルタイム通信が繋がらない）。
+
+```bash
 npm run dev:server     # http://localhost:3001 (ヘルスチェック: /health)
 npm run dev:web        # http://localhost:5173
 ```
 
 ※ 初回は `npm run build` で `packages/shared` をビルドしてから dev を起動すること。
+
+### 動作確認（4つのビュー）
+
+イベントID（`demo`など好きな文字列）ごとに以下のURLを開く:
+
+| ビュー | URL |
+|---|---|
+| ホスト | `/e/{eventId}/host` |
+| 発表者 | `/e/{eventId}/presenter` |
+| 参加者 | `/e/{eventId}` |
+| 会場スクリーン | `/e/{eventId}/screen` |
+
+会場スクリーンの画面共有機能（Screen Capture API）はセキュアコンテキスト（`localhost` / `https`）でのみ動くため、**必ず `localhost` 経由で開く**こと。
+
+### スマホなど別端末からアクセスする（同一LAN）
+
+`dev:web`（`vite --host`）は既にLAN内へバインドされるので、PCのLAN IPで `apps/web/.env.local`（gitignore対象・各自作成）に以下を設定するだけでよい:
+
+```
+VITE_SERVER_URL=http://<PCのLAN IP>:3001
+VITE_AUDIENCE_URL=http://<PCのLAN IP>:5173
+```
+
+`VITE_AUDIENCE_URL` は会場スクリーンのQRコードに埋め込む参加者URLの基点。スクリーンを画面共有のため `localhost` 経由で開いた場合でも、QRにはスマホから読めるLAN IPが埋め込まれるようにするための設定。
 
 ## Roadmap
 
