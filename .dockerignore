@@ -1,0 +1,16 @@
+# ビルドは Docker 内で行うので、ホストの成果物・依存・秘密は持ち込まない
+node_modules
+**/node_modules
+**/dist
+.git
+.gitignore
+# ★重要: LANテスト用の .env.local を本番ビルドに混入させない（VITE_SERVER_URL 等の漏れ防止）
+**/.env.local
+**/.env.*.local
+# 開発物・ドキュメント（イメージに不要）
+Dockerfile
+.dockerignore
+*.md
+scripts
+.claude
+.github

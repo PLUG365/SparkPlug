@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import path from 'node:path';
 import { randomUUID, randomBytes, createHmac } from 'node:crypto';
 import express from 'express';
 import { Server } from 'socket.io';
@@ -183,6 +184,17 @@ app.get('/events/:eventId/export.csv', (req, res) => {
   );
   res.send(body);
 });
+
+// 本番（単一コンテナ）: web のビルド済み静的ファイルを同一オリジンで配信する。
+// WEB_DIST 未設定なら配信しない（開発時は Vite が別ポートで配信）。必ず API ルートより後に登録する。
+const WEB_DIST = process.env.WEB_DIST;
+if (WEB_DIST) {
+  app.use(express.static(WEB_DIST));
+  // SPA フォールバック: 静的ファイルにも API にも当たらないパスは index.html を返す（React Router 用）
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(WEB_DIST, 'index.html'));
+  });
+}
 
 const httpServer = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
