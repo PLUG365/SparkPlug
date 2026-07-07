@@ -109,7 +109,7 @@ export interface ClientToServerEvents {
 
 /** サーバー → クライアント */
 export interface ServerToClientEvents {
-  joined: (payload: { eventId: string; participantCount: number }) => void;
+  joined: (payload: { eventId: string; participantCount: number; name?: string }) => void;
   /** 特権ロール（host / presenter）の参加がトークン不一致で拒否されたことを通知する */
   authRejected: (payload: { role: Role }) => void;
   reaction: (reaction: Reaction) => void;

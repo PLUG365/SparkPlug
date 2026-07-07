@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomUUID, createHmac } from 'node:crypto';
+import { randomUUID, randomBytes, createHmac } from 'node:crypto';
 import express from 'express';
 import { Server } from 'socket.io';
 import type {
@@ -34,6 +34,21 @@ function hostTokenFor(eventId: string): string {
 }
 
 const app = express();
+// REST エンドポイント用の CORS（Socket.IO の cors 設定とは別に Express にも必要）。
+// CORS_ORIGIN が文字列ならそれを、true ならリクエスト元 origin を反射して許可する。
+app.use((req, res, next) => {
+  const allow = typeof CORS_ORIGIN === 'string' ? CORS_ORIGIN : (req.headers.origin ?? '*');
+  res.setHeader('Access-Control-Allow-Origin', allow);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
@@ -46,6 +61,40 @@ app.get('/events/:eventId/host-link', (req, res) => {
     return;
   }
   res.json({ token: hostTokenFor(req.params.eventId) });
+});
+
+// ── イベント登録（作成フロー） ─────────────────────────────────────
+// 未登録IDに直接 join しても動く（Map の遅延生成）が、作成フロー経由だと名前が付く。
+/** 登録済みイベントのメタ情報 */
+interface EventMeta {
+  name: string;
+  createdAt: number;
+}
+/** eventId → メタ情報（作成フロー経由のみ登録される） */
+const events = new Map<string, EventMeta>();
+
+/** 紛らわしい文字（0/O/1/I/L）を除いた短縮ID用アルファベット */
+const ID_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz';
+/** 6文字の短縮IDを生成する。衝突していたら作り直す */
+function generateEventId(): string {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const bytes = randomBytes(6);
+    let id = '';
+    for (let i = 0; i < 6; i++) id += ID_ALPHABET[bytes[i] % ID_ALPHABET.length];
+    if (!events.has(id)) return id;
+  }
+  return randomUUID().replace(/-/g, '').slice(0, 8); // 事実上到達しないフォールバック
+}
+
+// イベントを作成する。短縮IDを発行し、host/presenter 用トークンを返す。
+// 名前は任意（未指定なら「無題のイベント」）。ストアは in-memory（サーバー再起動で消える）。
+app.post('/events', (req, res) => {
+  const rawName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const name = (rawName || '無題のイベント').slice(0, 60);
+  const eventId = generateEventId();
+  events.set(eventId, { name, createdAt: Date.now() });
+  console.log(`[event] created id=${eventId} name=${JSON.stringify(name)}`);
+  res.json({ eventId, name, hostToken: hostTokenFor(eventId) });
 });
 
 // ── イベントログ（サーバー内部型。shared には置かない） ──────────────
@@ -238,7 +287,7 @@ io.on('connection', (socket) => {
     // ロール別ルームにも join（質問の宛先絞り込みに使う）
     await socket.join(roleRoomOf(eventId, role));
     const count = (await io.in(roomOf(eventId)).fetchSockets()).length;
-    socket.emit('joined', { eventId, participantCount: count });
+    socket.emit('joined', { eventId, participantCount: count, name: events.get(eventId)?.name });
     io.to(roomOf(eventId)).emit('participantCount', count);
     // 実施中のアンケートがあれば本人にだけ現状を送る（全ロール共通）
     const polls = eventPolls.get(eventId);
