@@ -12,6 +12,7 @@ export function useEvent(eventId: string | undefined, role: Role, token?: string
   const [participantCount, setParticipantCount] = useState(0);
   const [connected, setConnected] = useState(false);
   const [rejected, setRejected] = useState(false);
+  const [name, setName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!eventId) return;
@@ -21,6 +22,10 @@ export function useEvent(eventId: string | undefined, role: Role, token?: string
       s.emit('join', { eventId, role, token });
     });
     s.on('disconnect', () => setConnected(false));
+    s.on('joined', ({ participantCount: c, name: n }) => {
+      setParticipantCount(c);
+      setName(n);
+    });
     s.on('participantCount', setParticipantCount);
     s.on('authRejected', () => setRejected(true));
     s.connect();
@@ -31,5 +36,5 @@ export function useEvent(eventId: string | undefined, role: Role, token?: string
     };
   }, [eventId, role, token]);
 
-  return { socket, connected, participantCount, rejected };
+  return { socket, connected, participantCount, rejected, name };
 }

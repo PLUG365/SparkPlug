@@ -8,7 +8,7 @@ import { useQuestions } from '../lib/useQuestions';
 import { useEventSettings } from '../lib/useEventSettings';
 import QuestionTriage from '../components/QuestionTriage';
 import AccessDenied from '../components/AccessDenied';
-import { SERVER_URL } from '../lib/socket';
+import { SERVER_URL, AUDIENCE_BASE_URL } from '../lib/socket';
 import { BRAND, headerBarStyle, pillBadgeStyle, pillButtonStyle } from '../lib/theme';
 
 const MAX_OPTIONS = 6;
@@ -22,10 +22,35 @@ function screenToggleStyle(on: boolean, connected: boolean): CSSProperties {
   return pillButtonStyle({ color: on ? BRAND.lime : '#999' });
 }
 
+/** 共有URLの1行。URL表示＋クリップボードへコピー */
+function ShareRow({ label, url }: { label: string; url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* クリップボード不可の環境は黙ってスルー（手動選択で対応） */
+    }
+  };
+  return (
+    <div style={{ fontSize: '0.9rem' }}>
+      <div style={{ color: '#666', marginBottom: 2 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <code style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', background: '#f4f4f4', padding: '0.35rem 0.5rem', borderRadius: 6 }}>{url}</code>
+        <button onClick={copy} style={{ padding: '0.35rem 0.7rem', borderRadius: 8, border: '2px solid #ccc', background: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {copied ? '✓ コピー済' : 'コピー'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Host() {
   const { eventId } = useParams();
   const token = useHostToken();
-  const { socket, connected, participantCount, rejected } = useEvent(eventId, 'host', token);
+  const { socket, connected, participantCount, rejected, name } = useEvent(eventId, 'host', token);
   const { polls, resultsByPollId } = usePollList(socket);
   const questions = useQuestions(socket);
   const { qrVisible, soundEnabled, commentFlow } = useEventSettings(socket);
@@ -51,13 +76,18 @@ export default function Host() {
   const draftPolls = polls.filter((p) => p.status === 'draft');
   const closedPolls = polls.filter((p) => p.status === 'closed').sort((a, b) => b.at - a.at);
 
+  // 共有用URL（参加者は無トークン、発表者はホストと同じトークン）とQR
+  const audienceUrl = `${AUDIENCE_BASE_URL}/e/${eventId}`;
+  const presenterUrl = `${AUDIENCE_BASE_URL}/e/${eventId}/presenter?t=${token ?? ''}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(audienceUrl)}`;
+
   // トークン不一致でサーバーに拒否されたらホスト操作を一切見せない
   if (rejected) return <AccessDenied roleLabel="ホスト" />;
 
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
       <header style={headerBarStyle}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>🎛️ ホスト</h1>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>🎛️ ホスト{name ? `｜${name}` : ''}</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={pillBadgeStyle(connected)}>
             {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
@@ -76,6 +106,18 @@ export default function Host() {
           </a>
         </div>
       </header>
+
+      {/* ── 共有（この作成済みイベントの参加者/発表者リンクとQR） ───────── */}
+      <section aria-label="共有" style={{ margin: '1.5rem 0', padding: '1rem', border: '3px solid #ddd', borderRadius: 18 }}>
+        <h2 style={{ fontSize: '1.1rem', marginTop: 0 }}>🔗 共有</h2>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <ShareRow label="参加者URL（スマホで開く / QRと同じ）" url={audienceUrl} />
+            {token && <ShareRow label="発表者URL（登壇者に渡す）" url={presenterUrl} />}
+          </div>
+          <img src={qrUrl} alt="参加者URLのQRコード" width={120} height={120} style={{ background: '#fff', borderRadius: 10, padding: 6 }} />
+        </div>
+      </section>
 
       {/* ── スクリーン設定（会場スクリーンのQR表示・効果音をホストから制御） ───────── */}
       <section aria-label="スクリーン設定" style={{ margin: '1.5rem 0', padding: '1rem', border: '3px solid #ddd', borderRadius: 18 }}>
