@@ -92,7 +92,7 @@ export default function Audience() {
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
       <header style={headerBarStyle}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>SparkPlug ⚡ {eventId}</h1>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>SparkPlug ⚡</h1>
         <span style={pillBadgeStyle(connected)}>
           {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
         </span>

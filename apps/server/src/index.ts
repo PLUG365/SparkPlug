@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHmac } from 'node:crypto';
 import express from 'express';
 import { Server } from 'socket.io';
 import type {
@@ -18,9 +18,34 @@ const PORT = Number(process.env.PORT ?? 3001);
 // dev で LAN 実機（スマホ）テストするための緩和。本番デプロイ時は CORS_ORIGIN を必ず明示すること。
 const CORS_ORIGIN: string | boolean = process.env.CORS_ORIGIN ?? true;
 
+// ── 特権ロール（host / presenter）の権限トークン（乗っ取り対策） ─────────────
+// 誰でも /e/:id/host を開けば host を名乗れる問題を塞ぐ。特権ロールは eventId ごとに
+// サーバー秘密鍵から導出したトークンの提示を必須にする。トークンはURLの ?t= で配布する。
+//   token = HMAC-SHA256(HOST_SECRET, eventId) の先頭20文字（base64url）
+// 秘密鍵はデプロイ時に HOST_SECRET を必ず設定すること（未設定＝開発用の既定値）。
+const DEFAULT_HOST_SECRET = 'sparkplug-dev-secret';
+const HOST_SECRET = process.env.HOST_SECRET ?? DEFAULT_HOST_SECRET;
+const HOST_SECRET_IS_DEFAULT = HOST_SECRET === DEFAULT_HOST_SECRET;
+const PRIVILEGED_ROLES: ReadonlySet<Role> = new Set<Role>(['host', 'presenter']);
+
+/** eventId に対する特権ロール用トークンを導出する（サーバー秘密鍵に依存、決定的） */
+function hostTokenFor(eventId: string): string {
+  return createHmac('sha256', HOST_SECRET).update(eventId).digest('base64url').slice(0, 20);
+}
+
 const app = express();
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
+});
+
+// 開発補助: 既定シークレット使用時（＝未設定＝開発）のみ、指定イベントの特権トークンを返す。
+// 本番（HOST_SECRET 設定済み）では 403。トークンは秘密鍵から導出されるため公開してはならない。
+app.get('/events/:eventId/host-link', (req, res) => {
+  if (!HOST_SECRET_IS_DEFAULT) {
+    res.status(403).json({ error: 'disabled when HOST_SECRET is set; use scripts/host-link.mjs' });
+    return;
+  }
+  res.json({ token: hostTokenFor(req.params.eventId) });
 });
 
 // ── イベントログ（サーバー内部型。shared には置かない） ──────────────
@@ -126,7 +151,7 @@ function roleRoomOf(eventId: string, role: Role): string {
 
 // ── スクリーン設定ストア ────────────────────────────────────────
 /** スクリーン設定の既定値。QRコード表示・効果音とも初期は ON */
-const DEFAULT_EVENT_SETTINGS: EventSettings = { qrVisible: true, soundEnabled: true };
+const DEFAULT_EVENT_SETTINGS: EventSettings = { qrVisible: true, soundEnabled: true, commentFlow: 'horizontal' };
 
 /** eventId → スクリーン設定 */
 const eventSettings = new Map<string, EventSettings>();
@@ -200,7 +225,13 @@ io.on('connection', (socket) => {
   let joinedRole: Role | undefined;
   let lastSeAt = 0;
 
-  socket.on('join', async ({ eventId, role }: JoinPayload) => {
+  socket.on('join', async ({ eventId, role, token }: JoinPayload) => {
+    // 特権ロール（host / presenter）はトークン照合。不一致・欠如なら権限を与えず拒否して終了。
+    if (PRIVILEGED_ROLES.has(role) && token !== hostTokenFor(eventId)) {
+      socket.emit('authRejected', { role });
+      console.warn(`[security] rejected privileged join event=${eventId} role=${role} socket=${socket.id}`);
+      return;
+    }
     joinedEventId = eventId;
     joinedRole = role;
     await socket.join(roomOf(eventId));
@@ -446,6 +477,14 @@ io.on('connection', (socket) => {
     io.to(roomOf(joinedEventId)).emit('eventSettings', getEventSettings(joinedEventId));
   });
 
+  socket.on('setCommentFlow', (flow) => {
+    if (!joinedEventId || joinedRole !== 'host') return;
+    if (flow !== 'horizontal' && flow !== 'vertical') return;
+    getEventSettings(joinedEventId).commentFlow = flow;
+    // トグル操作はノイズになるため CSV ログには記録しない
+    io.to(roomOf(joinedEventId)).emit('eventSettings', getEventSettings(joinedEventId));
+  });
+
   socket.on('disconnect', async () => {
     if (!joinedEventId) return;
     const count = (await io.in(roomOf(joinedEventId)).fetchSockets()).length;
@@ -455,4 +494,10 @@ io.on('connection', (socket) => {
 
 httpServer.listen(PORT, () => {
   console.log(`SparkPlug server listening on http://localhost:${PORT}`);
+  if (HOST_SECRET_IS_DEFAULT) {
+    console.warn(
+      '[security] HOST_SECRET 未設定: 既定の開発用シークレットを使用中。' +
+        '本番デプロイ前に必ず HOST_SECRET を設定すること（設定しないと host/presenter トークンが推測可能）。',
+    );
+  }
 });
