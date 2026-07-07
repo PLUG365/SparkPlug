@@ -2,10 +2,12 @@ import { useState, type CSSProperties } from 'react';
 import { useParams } from 'react-router-dom';
 import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+import { useHostToken } from '../lib/hostToken';
 import { usePollList } from '../lib/usePollList';
 import { useQuestions } from '../lib/useQuestions';
 import { useEventSettings } from '../lib/useEventSettings';
 import QuestionTriage from '../components/QuestionTriage';
+import AccessDenied from '../components/AccessDenied';
 import { SERVER_URL } from '../lib/socket';
 import { BRAND, headerBarStyle, pillBadgeStyle, pillButtonStyle } from '../lib/theme';
 
@@ -22,10 +24,11 @@ function screenToggleStyle(on: boolean, connected: boolean): CSSProperties {
 
 export default function Host() {
   const { eventId } = useParams();
-  const { socket, connected, participantCount } = useEvent(eventId, 'host');
+  const token = useHostToken();
+  const { socket, connected, participantCount, rejected } = useEvent(eventId, 'host', token);
   const { polls, resultsByPollId } = usePollList(socket);
   const questions = useQuestions(socket);
-  const { qrVisible, soundEnabled } = useEventSettings(socket);
+  const { qrVisible, soundEnabled, commentFlow } = useEventSettings(socket);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
 
@@ -48,10 +51,13 @@ export default function Host() {
   const draftPolls = polls.filter((p) => p.status === 'draft');
   const closedPolls = polls.filter((p) => p.status === 'closed').sort((a, b) => b.at - a.at);
 
+  // トークン不一致でサーバーに拒否されたらホスト操作を一切見せない
+  if (rejected) return <AccessDenied roleLabel="ホスト" />;
+
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
       <header style={headerBarStyle}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>🎛️ ホスト｜{eventId}</h1>
+        <h1 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>🎛️ ホスト</h1>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={pillBadgeStyle(connected)}>
             {connected ? `🟢 ${participantCount}人が参加中` : '🔴 接続中…'}
@@ -88,6 +94,13 @@ export default function Host() {
             style={screenToggleStyle(soundEnabled, connected)}
           >
             {soundEnabled ? '🔊 効果音ON' : '🔇 効果音OFF'}
+          </button>
+          <button
+            onClick={() => socket?.emit('setCommentFlow', commentFlow === 'horizontal' ? 'vertical' : 'horizontal')}
+            disabled={!connected}
+            style={screenToggleStyle(true, connected)}
+          >
+            {commentFlow === 'horizontal' ? '💬 コメント：横流れ' : '💬 コメント：下から上'}
           </button>
         </div>
       </section>

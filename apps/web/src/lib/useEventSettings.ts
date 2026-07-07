@@ -8,7 +8,7 @@ import type { SparkPlugSocket } from './socket';
  * 初期値は既定 ON（join 同期が届く前でもデフォルトONの見た目になるように）。
  */
 export function useEventSettings(socket: SparkPlugSocket | null): EventSettings {
-  const [settings, setSettings] = useState<EventSettings>({ qrVisible: true, soundEnabled: true });
+  const [settings, setSettings] = useState<EventSettings>({ qrVisible: true, soundEnabled: true, commentFlow: 'horizontal' });
 
   useEffect(() => {
     if (!socket) return;

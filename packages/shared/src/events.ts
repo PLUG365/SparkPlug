@@ -62,15 +62,21 @@ export interface Poll {
   at: number;
 }
 
-/** イベントごとのスクリーン設定。qrVisible=QRコード表示 / soundEnabled=効果音ミュート制御。共に既定 true */
+/** コメントの流れ方。horizontal=右→左（ニコニコ的な横流れ）/ vertical=下→上に昇る。既定 horizontal */
+export type CommentFlow = 'horizontal' | 'vertical';
+
+/** イベントごとのスクリーン設定。qrVisible=QRコード表示 / soundEnabled=効果音ミュート制御（共に既定 true）/ commentFlow=コメントの流れ方（既定 horizontal） */
 export interface EventSettings {
   qrVisible: boolean;
   soundEnabled: boolean;
+  commentFlow: CommentFlow;
 }
 
 export interface JoinPayload {
   eventId: string;
   role: Role;
+  /** host / presenter などの特権ロールで参加する際に必要なトークン（URLの ?t= から取得）。audience / screen では不要 */
+  token?: string;
 }
 
 /** クライアント → サーバー */
@@ -97,11 +103,15 @@ export interface ClientToServerEvents {
   setQrVisible: (visible: boolean) => void;
   /** host ロールのみ。会場スクリーンの効果音をON/OFF（ミュート）する */
   setSoundEnabled: (enabled: boolean) => void;
+  /** host ロールのみ。会場スクリーンのコメントの流れ方（横=右→左／縦=下→上）を切り替える */
+  setCommentFlow: (flow: CommentFlow) => void;
 }
 
 /** サーバー → クライアント */
 export interface ServerToClientEvents {
   joined: (payload: { eventId: string; participantCount: number }) => void;
+  /** 特権ロール（host / presenter）の参加がトークン不一致で拒否されたことを通知する */
+  authRejected: (payload: { role: Role }) => void;
   reaction: (reaction: Reaction) => void;
   comment: (comment: ChatComment) => void;
   /** ルーム全体に配信される質問（表示名付き） */

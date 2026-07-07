@@ -17,7 +17,8 @@ const SE_LABEL: Record<SeKind, string> = {
   don: '🥁シャンシャン！', ka: 'カッ', clap: '👏👏👏',
 };
 
-type FlyingComment = ChatComment & { top: number };
+// top = 横流れ時の縦位置レーン(%)、left = 縦流れ時の横位置レーン(%)。モードに応じて描画側で使い分ける
+type FlyingComment = ChatComment & { top: number; left?: number };
 type FlyingQuestion = Question & { top: number };
 type FloatingReaction = Reaction & { uid: string; left: number };
 type SePop = { uid: string; label: string; left: number; top: number };
@@ -48,7 +49,7 @@ export default function Screen() {
   const [shareError, setShareError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const { poll, counts, total } = usePoll(socket);
-  const { qrVisible, soundEnabled } = useEventSettings(socket);
+  const { qrVisible, soundEnabled, commentFlow } = useEventSettings(socket);
   // onSe は [socket] 依存の effect 内で購読するため、最新の soundEnabled を ref 経由で参照する
   // （依存に含めて毎回 re-subscribe すると他のリスナーまで貼り直しになるため）
   const soundEnabledRef = useRef(soundEnabled);
@@ -56,6 +57,8 @@ export default function Screen() {
   const [pollVisible, setPollVisible] = useState(false);
   // コメント/AA/質問それぞれ専用のレーン割り当てカウンタ（同時期の複数投稿が重ならないように）
   const commentLaneRef = useRef(0);
+  // 縦流れ（下→上）モード用の横位置レーン。横流れの top レーンとは別カウンタで回す
+  const commentColRef = useRef(0);
   const asciiLaneRef = useRef(0);
   const questionLaneRef = useRef(0);
   const allQuestions = useQuestions(socket);
@@ -82,8 +85,12 @@ export default function Screen() {
         setTimeout(() => setAsciiComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
         return;
       }
-      // 10レーンを順番に割り当て、同時期に来ても同じ高さに重ならないようにする
-      setComments((prev) => [...prev, { ...c, top: nextLaneTop(commentLaneRef, 10, 5, 65) }]);
+      // 横流れ用に10レーン(縦位置)、縦流れ用に8レーン(横位置)を両方割り当てておく（実行中にモードが切り替わっても対応できるよう）
+      setComments((prev) => [...prev, {
+        ...c,
+        top: nextLaneTop(commentLaneRef, 10, 5, 65),
+        left: nextLaneTop(commentColRef, 8, 4, 74),
+      }]);
       setTimeout(() => setComments((prev) => prev.filter((x) => x.id !== c.id)), 12000);
     };
     const onQuestion = (q: Question) => {
@@ -188,12 +195,13 @@ export default function Screen() {
 
       <style>{`
         @keyframes flyLeft { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
+        @keyframes flyUp { from { transform: translateY(100vh); } to { transform: translateY(-100%); } }
         @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-40vh); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
       `}</style>
 
-      <div style={{ position: 'absolute', top: 16, left: 24, fontSize: '1.1rem', color: '#cddc29', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span>SparkPlug ⚡ {eventId}</span>
+      <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', fontSize: '1.1rem', color: '#cddc29', display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+        <span>SparkPlug ⚡</span>
         {/* 参加者数を黄緑ピルで軽く強調（未接続時はグレーピル） */}
         <span style={pillBadgeStyle(connected)}>
           {connected ? `${participantCount}人が参加中` : '接続中…'}
@@ -203,13 +211,24 @@ export default function Screen() {
       {comments.map((c) => (
         <div
           key={c.id}
-          style={{
-            position: 'absolute', top: `${c.top}%`, left: 0, whiteSpace: 'nowrap',
-            fontSize: '2.2rem', fontWeight: 700,
-            // 白背景（画面共有でスライド等が映っても）で消えないよう、濃い縁取り＋ぼかしを併用
-            textShadow: '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 6px #000',
-            animation: 'flyLeft 12s linear forwards', willChange: 'transform',
-          }}
+          style={
+            // 白背景（画面共有でスライド等が映っても）で消えないよう、濃い縁取り＋ぼかしを併用（両モード共通）
+            commentFlow === 'vertical'
+              ? {
+                  // 下→上に昇る。長文は折り返して縦の帯になるよう幅を制限＋中央寄せ
+                  position: 'absolute', top: 0, left: `${c.left ?? 50}%`, maxWidth: '22vw',
+                  whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'center',
+                  fontSize: '2rem', fontWeight: 700,
+                  textShadow: '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 6px #000',
+                  animation: 'flyUp 12s linear forwards', willChange: 'transform',
+                }
+              : {
+                  position: 'absolute', top: `${c.top}%`, left: 0, whiteSpace: 'nowrap',
+                  fontSize: '2.2rem', fontWeight: 700,
+                  textShadow: '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 0 6px #000',
+                  animation: 'flyLeft 12s linear forwards', willChange: 'transform',
+                }
+          }
         >
           {c.body}
           {c.displayName && <span style={{ fontSize: '1rem', color: '#cddc29', marginLeft: 8 }}>@{c.displayName}</span>}

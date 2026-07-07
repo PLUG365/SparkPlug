@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { QuestionStatus } from '@sparkplug/shared';
 import { useEvent } from '../lib/useEvent';
+import { useHostToken } from '../lib/hostToken';
 import { useQuestions } from '../lib/useQuestions';
 import QuestionTriage from '../components/QuestionTriage';
+import AccessDenied from '../components/AccessDenied';
 import { BRAND, headerBarStyle, pillBadgeStyle } from '../lib/theme';
 
 // ── エモメーターのしきい値・パラメータ（ここに集約） ──────────────
@@ -54,7 +56,8 @@ function pointsWithin(events: HeatEvent[], now: number, sec: number): number {
 
 export default function Presenter() {
   const { eventId } = useParams();
-  const { socket, connected, participantCount } = useEvent(eventId, 'presenter');
+  const token = useHostToken();
+  const { socket, connected, participantCount, rejected } = useEvent(eventId, 'presenter', token);
   const questions = useQuestions(socket);
 
   // 熱量イベント（リアクション/SE/コメント/質問）を重み付きで貯める（描画は別途 1 秒ごとに再計算）
@@ -141,10 +144,13 @@ export default function Presenter() {
     socket?.emit('triageQuestion', questionId, status);
   };
 
+  // トークン不一致でサーバーに拒否されたら発表者操作を一切見せない
+  if (rejected) return <AccessDenied roleLabel="発表者" />;
+
   return (
     <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: 480, margin: '0 auto' }}>
       <header style={headerBarStyle}>
-        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>🎤 発表者ビュー {eventId}</h1>
+        <h1 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>🎤 発表者ビュー</h1>
         <span style={pillBadgeStyle(connected)}>
           {connected ? `🟢 ${participantCount}人` : '🔴 接続中…'}
         </span>
