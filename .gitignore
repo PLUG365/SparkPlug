@@ -7,3 +7,4 @@ dist/
 .DS_Store
 Thumbs.db
 *.log
+.secrets.local.md
