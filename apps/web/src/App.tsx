@@ -79,6 +79,7 @@ export default function App() {
           <li><Link to={`/e/demo/presenter${dt}`}>発表者ビュー</Link></li>
           <li><Link to="/e/demo">参加者ビュー</Link></li>
           <li><Link to="/e/demo/screen">会場スクリーン</Link></li>
+          <li><Link to="/e/demo/overlay?debug=1">OBSオーバーレイ</Link></li>
         </ul>
         {!demoToken && (
           <p style={{ color: '#999', fontSize: '0.85rem' }}>
