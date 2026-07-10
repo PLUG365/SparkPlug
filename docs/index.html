@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SparkPlug ⚡ — 場に火をつけろ。</title>
+<meta name="description" content="発表者と参加者の間に流れる情報を可視化・拡張・保存する、コミュニティイベント向けリアルタイム盛り上げ + 振り返りアプリ。" />
+<meta property="og:title" content="SparkPlug ⚡ — 場に火をつけろ。" />
+<meta property="og:description" content="コメント流し・リアクション爆発・アンケート・エモメーター・質問トリアージ。コミュニティイベントをリアルタイムに盛り上げるオープンソースアプリ。" />
+<meta property="og:type" content="website" />
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<style>
+  :root {
+    --red: #d0342c;
+    --red-hot: #e5352b;
+    --yellow: #f5c400;
+    --orange: #f5a300;
+    --lime: #cddc29;
+    --ink: #1a1a1a;
+    --bg: #0d0d0f;
+    --bg2: #141417;
+    --paper: #fafafa;
+    --muted: #9a9aa2;
+    --radius: 18px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: #ececef;
+    font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  img { max-width: 100%; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    position: relative;
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 96px 24px 72px;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% 118%, rgba(208,52,44,.38), transparent 65%),
+      radial-gradient(ellipse 45% 32% at 50% 108%, rgba(245,163,0,.30), transparent 70%),
+      linear-gradient(180deg, #0d0d0f 0%, #131316 100%);
+    overflow: hidden;
+  }
+  /* 流れるコメント（ニコニコ風） */
+  .flow { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .flow span {
+    position: absolute;
+    left: 100%;
+    white-space: nowrap;
+    font-weight: 700;
+    opacity: 0;
+    text-shadow: 0 2px 12px rgba(0,0,0,.6);
+    animation: flow linear infinite;
+  }
+  @keyframes flow {
+    0%   { transform: translateX(0);              opacity: 0; }
+    4%   { opacity: var(--op, .55); }
+    92%  { opacity: var(--op, .55); }
+    100% { transform: translateX(calc(-100vw - 110%)); opacity: 0; }
+  }
+  /* 浮かび上がるリアクション */
+  .rise { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .rise span {
+    position: absolute;
+    bottom: -48px;
+    font-size: 26px;
+    opacity: 0;
+    animation: rise ease-in infinite;
+  }
+  @keyframes rise {
+    0%   { transform: translateY(0) scale(.7); opacity: 0; }
+    12%  { opacity: .85; }
+    100% { transform: translateY(-58vh) scale(1.25) rotate(14deg); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .flow span, .rise span, .logo-spark { animation: none !important; opacity: 0 !important; }
+  }
+
+  .hero-inner { position: relative; z-index: 2; max-width: 760px; }
+  .hero .logo { width: 148px; height: 148px; margin-bottom: 8px; filter: drop-shadow(0 10px 34px rgba(208,52,44,.45)); }
+  .logo-spark { animation: flicker 2.4s ease-in-out infinite; transform-origin: 265px 400px; }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    45%      { opacity: .75; transform: scale(.94) rotate(-2deg); }
+    60%      { opacity: 1;  transform: scale(1.07) rotate(1.5deg); }
+  }
+  .wordmark { font-size: clamp(44px, 8vw, 72px); font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+  .wordmark .plug { color: var(--red-hot); }
+  .wordmark .bolt { color: var(--orange); font-style: normal; }
+  .tagline { margin-top: 14px; font-size: clamp(19px, 3.2vw, 26px); font-weight: 700; color: #fff; }
+  .sub {
+    margin: 18px auto 0;
+    max-width: 560px;
+    color: var(--muted);
+    font-size: 15.5px;
+  }
+  .cta { margin-top: 38px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 13px 26px;
+    border-radius: 999px;
+    font-weight: 700; font-size: 15px;
+    text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--red-hot), #b02620);
+    color: #fff;
+    box-shadow: 0 6px 24px rgba(208,52,44,.4);
+  }
+  .btn-primary:hover { box-shadow: 0 10px 32px rgba(208,52,44,.55); }
+  .btn-ghost { border: 1.5px solid #3a3a40; color: #ddd; background: rgba(255,255,255,.03); }
+  .btn-ghost:hover { border-color: var(--yellow); color: var(--yellow); }
+  .hero-note { margin-top: 26px; font-size: 12.5px; color: #6d6d75; }
+
+  /* ---------- sections ---------- */
+  section { padding: 88px 24px; }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  .kicker {
+    display: inline-block;
+    font-size: 13px; font-weight: 800; letter-spacing: .14em;
+    color: var(--orange);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h2 { font-size: clamp(26px, 4.4vw, 36px); font-weight: 800; letter-spacing: -.01em; line-height: 1.35; }
+  .lead { margin-top: 14px; color: var(--muted); max-width: 640px; }
+
+  /* 3軸 */
+  .axes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-top: 44px; }
+  .axis {
+    position: relative;
+    background: var(--bg2);
+    border: 1px solid #242428;
+    border-radius: var(--radius);
+    padding: 30px 26px;
+    overflow: hidden;
+    transition: transform .2s ease, border-color .2s ease;
+  }
+  .axis:hover { transform: translateY(-4px); }
+  .axis::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: var(--accent);
+  }
+  .axis:hover { border-color: color-mix(in srgb, var(--accent) 55%, #242428); }
+  .axis .emoji { font-size: 34px; }
+  .axis h3 { margin-top: 12px; font-size: 20px; color: var(--accent); }
+  .axis p { margin-top: 8px; font-size: 14.5px; color: #b9b9c0; }
+  .ax-fire   { --accent: var(--red-hot); }
+  .ax-mic    { --accent: var(--yellow); }
+  .ax-chart  { --accent: var(--lime); }
+
+  /* 機能グリッド */
+  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 44px; }
+  .feat {
+    background: var(--bg2);
+    border: 1px solid #242428;
+    border-radius: 14px;
+    padding: 22px 20px;
+  }
+  .feat .fi { font-size: 24px; }
+  .feat h4 { margin-top: 10px; font-size: 15.5px; color: #fff; }
+  .feat p { margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+
+  /* 4ビュー */
+  .views-section { background: linear-gradient(180deg, var(--bg) 0%, #16100f 50%, var(--bg) 100%); }
+  .views { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 44px; counter-reset: v; }
+  .view {
+    background: rgba(255,255,255,.03);
+    border: 1px solid #2a2a2e;
+    border-radius: 14px;
+    padding: 24px 20px;
+  }
+  .view .badge {
+    display: inline-block;
+    font-size: 11.5px; font-weight: 800; letter-spacing: .08em;
+    padding: 4px 12px; border-radius: 999px;
+    background: rgba(245,196,0,.12); color: var(--yellow);
+  }
+  .view h4 { margin-top: 12px; font-size: 17px; }
+  .view p { margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+  .view code {
+    display: inline-block; margin-top: 10px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12px; color: var(--lime);
+    background: rgba(205,220,41,.08);
+    padding: 3px 9px; border-radius: 6px;
+  }
+
+  /* 運用 */
+  .ops { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 44px; }
+  .op {
+    border: 1px solid #242428; border-radius: 14px; padding: 24px 20px;
+    background: var(--bg2);
+  }
+  .op .num { font-size: 26px; font-weight: 800; color: var(--yellow); }
+  .op p { margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+
+  /* CTA帯 */
+  .band {
+    text-align: center;
+    background:
+      radial-gradient(ellipse 65% 90% at 50% 130%, rgba(245,163,0,.22), transparent 65%),
+      var(--bg2);
+    border-top: 1px solid #242428;
+    border-bottom: 1px solid #242428;
+  }
+  .band h2 .spark { color: var(--orange); }
+
+  footer { padding: 44px 24px 56px; text-align: center; font-size: 12.5px; color: #6d6d75; }
+  footer a { color: #9a9aa2; }
+  footer .sep { margin: 0 10px; opacity: .4; }
+  .plug-credit { margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="flow" aria-hidden="true">
+    <span style="top:8%;  font-size:22px; --op:.5;  color:#fff;          animation-duration:11s; animation-delay:0s">それな〜！！</span>
+    <span style="top:16%; font-size:18px; --op:.45; color:var(--yellow); animation-duration:14s; animation-delay:3.2s">👏👏👏👏👏</span>
+    <span style="top:24%; font-size:24px; --op:.5;  color:#fff;          animation-duration:10s; animation-delay:6.5s">わかりみが深い</span>
+    <span style="top:33%; font-size:17px; --op:.4;  color:var(--lime);   animation-duration:15s; animation-delay:1.5s">キタ━━━(゜∀゜)━━━!!</span>
+    <span style="top:60%; font-size:20px; --op:.45; color:#fff;          animation-duration:12s; animation-delay:4.8s">8888888888</span>
+    <span style="top:70%; font-size:18px; --op:.4;  color:var(--orange); animation-duration:13s; animation-delay:8s">デモ動いた！すごい</span>
+    <span style="top:79%; font-size:22px; --op:.5;  color:#fff;          animation-duration:11.5s; animation-delay:2.4s">最高では？？</span>
+    <span style="top:88%; font-size:17px; --op:.4;  color:var(--yellow); animation-duration:14.5s; animation-delay:9.6s">質問：それどうやって作ったんですか？</span>
+  </div>
+  <div class="rise" aria-hidden="true">
+    <span style="left:6%;  animation-duration:6s;   animation-delay:0s">🔥</span>
+    <span style="left:13%; animation-duration:7.5s; animation-delay:2.8s">👏</span>
+    <span style="left:22%; animation-duration:6.5s; animation-delay:1.2s">⚡</span>
+    <span style="left:78%; animation-duration:7s;   animation-delay:.6s">🎉</span>
+    <span style="left:86%; animation-duration:6.2s; animation-delay:3.4s">🔥</span>
+    <span style="left:93%; animation-duration:7.8s; animation-delay:1.9s">❤️</span>
+  </div>
+
+  <div class="hero-inner">
+    <svg class="logo" viewBox="0 0 512 512" role="img" aria-label="SparkPlug ロゴ">
+      <path d="M256 150 C 256 90, 200 95, 200 46" fill="none" stroke="#e8e8e8" stroke-width="14" stroke-linecap="round"/>
+      <rect x="174" y="142" width="164" height="160" rx="38" fill="#d0342c"/>
+      <rect x="214" y="300" width="24" height="46" rx="7" fill="#f5c400"/>
+      <rect x="274" y="300" width="24" height="46" rx="7" fill="#f5c400"/>
+      <polygon class="logo-spark" points="282,352 238,420 262,420 248,470 300,398 274,398" fill="#cddc29" stroke="#e8e8e8" stroke-width="5" stroke-linejoin="round"/>
+      <g stroke="#f5a300" stroke-width="9" stroke-linecap="round">
+        <line x1="196" y1="362" x2="182" y2="381"/>
+        <line x1="330" y1="362" x2="344" y2="381"/>
+      </g>
+    </svg>
+    <h1 class="wordmark">Spark<em class="bolt">⚡</em><span class="plug">Plug</span></h1>
+    <p class="tagline">場に火をつけろ。</p>
+    <p class="sub">発表者と参加者の間に流れる情報を<strong style="color:#fff">可視化・拡張・保存</strong>する、コミュニティイベント向けのリアルタイム盛り上げ + 振り返りアプリ。参加者はQRを読むだけ、アプリのインストール不要。</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/plug365/sparkplug">GitHub で見る →</a>
+      <a class="btn btn-ghost" href="https://github.com/plug365/sparkplug/blob/main/docs/主催者マニュアル.md">主催者マニュアル 📖</a>
+    </div>
+    <p class="hero-note">Spark plug = 点火プラグ。エンジンをかける。場に火をつける。</p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <span class="kicker">3 Pillars</span>
+    <h2>盛り上げて、拾い上げて、振り返る。</h2>
+    <p class="lead">イベントの「その瞬間」だけで終わらせない。会場の熱をリアルタイムに増幅しながら、あとから資産になるログとして残します。</p>
+    <div class="axes">
+      <div class="axis ax-fire">
+        <div class="emoji">🔥</div>
+        <h3>盛り上げ</h3>
+        <p>ニコニコ風コメント流し（AA対応）、リアクション爆発、効果音（ドン・カッ・拍手）、会場スクリーン演出。発表中の空気を全員で作る。</p>
+      </div>
+      <div class="axis ax-mic">
+        <div class="emoji">🎤</div>
+        <h3>拾い上げ</h3>
+        <p>選択式アンケートのリアルタイム集計、参加者からの質問、いいねによる優先度づけ。声の大きい人だけじゃない、全員の声を拾う。</p>
+      </div>
+      <div class="axis ax-chart">
+        <div class="emoji">📊</div>
+        <h3>振り返り</h3>
+        <p>全ログをCSVエクスポート（Excel対応）。Claude や ChatGPT に投げれば、盛り上がりのタイムラインや質問の傾向をAIが分析。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <span class="kicker">Features</span>
+    <h2>本番で使える機能、ぜんぶ入り。</h2>
+    <div class="features">
+      <div class="feat"><div class="fi">💬</div><h4>コメント流し</h4><p>横流れ ⇄ 下から上をホストが切替。匿名/記名どちらもOK。</p></div>
+      <div class="feat"><div class="fi">🎨</div><h4>AAコメント</h4><p>複数行アスキーアートを等幅・改行保持でゆっくり流す。キタ━━━!!</p></div>
+      <div class="feat"><div class="fi">🔊</div><h4>効果音</h4><p>ドン/カッ/拍手。Web Audio API 合成フォールバック付き。</p></div>
+      <div class="feat"><div class="fi">📊</div><h4>アンケート</h4><p>ホストが作成・締切。投票し直し可、スクリーンにライブ集計。</p></div>
+      <div class="feat"><div class="fi">📈</div><h4>エモメーター</h4><p>発表者ビューに会場の熱量を波形＋バイブで伝える。</p></div>
+      <div class="feat"><div class="fi">🙋</div><h4>質問トリアージ</h4><p>いいね順で「今答える/後で/後日」に振り分け、スクリーンにピン留め。</p></div>
+      <div class="feat"><div class="fi">🖥️</div><h4>画面共有</h4><p>発表スライドを会場スクリーンの背景に取り込み、演出をその上に重ねる。</p></div>
+      <div class="feat"><div class="fi">📥</div><h4>CSVエクスポート</h4><p>UTF-8 BOM・Excel対応。イベント終了時にワンクリックで回収。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="views-section">
+  <div class="wrap">
+    <span class="kicker">4 Views</span>
+    <h2>役割ごとに最適化された4つの画面。</h2>
+    <p class="lead">同じイベントIDを開くだけ。参加者と会場スクリーンはURLひとつ、ホストと発表者は権限トークン付きリンクで乗っ取りを防止。</p>
+    <div class="views">
+      <div class="view"><span class="badge">AUDIENCE</span><h4>📱 参加者</h4><p>QRコードを読んでブラウザで即参加。コメント・リアクション・投票・質問。</p><code>/e/{eventId}</code></div>
+      <div class="view"><span class="badge">SCREEN</span><h4>🖥️ 会場スクリーン</h4><p>コメントと演出が流れるメイン画面。QR表示・効果音もここから。</p><code>/e/{eventId}/screen</code></div>
+      <div class="view"><span class="badge">PRESENTER</span><h4>🎤 発表者</h4><p>エモメーターで熱量を感じながら、質問を手元で確認。</p><code>/e/{eventId}/presenter?t=…</code></div>
+      <div class="view"><span class="badge">HOST</span><h4>🎛️ ホスト</h4><p>アンケート作成・質問トリアージ・演出切替・CSVエクスポート。</p><code>/e/{eventId}/host?t=…</code></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="kicker">Ops &amp; Cost</span>
+    <h2>身軽に運用、財布に優しく。</h2>
+    <div class="ops">
+      <div class="op"><div class="num">1 コンテナ</div><p>Express + Socket.IO がビルド済み React SPA を同一オリジン配信。CORS 不要のシンプル構成で Azure Container Apps にデプロイ。</p></div>
+      <div class="op"><div class="num">¥0 / 待機時</div><p>scale-to-zero でアクセスが無ければ実行コストゼロ。定常コストはコンテナレジストリの約 $5/月 のみ。</p></div>
+      <div class="op"><div class="num">数十円〜 / イベント日</div><p>当日だけ min replica 1 に上げて数十〜数百円。終わったらCSVを回収してまた眠らせる。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>次のイベント、<span class="spark">⚡</span> 点火してみませんか？</h2>
+    <p class="lead" style="margin-left:auto;margin-right:auto">MIT ライセンスのオープンソース。クローンして <code style="color:var(--lime)">npm install && npm run build</code> から始められます。</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/plug365/sparkplug">⭐ GitHub リポジトリへ</a>
+      <a class="btn btn-ghost" href="https://github.com/plug365/sparkplug#開発">開発を始める</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>
+    <a href="https://github.com/plug365/sparkplug">GitHub</a><span class="sep">·</span>
+    <a href="https://github.com/plug365/sparkplug/blob/main/LICENSE">MIT License</a><span class="sep">·</span>
+    効果音素材: <a href="https://otologic.jp/">OtoLogic</a>（CC BY 4.0）
+  </div>
+  <p class="plug-credit">SparkPlug は <a href="https://github.com/PLUG365">PLUG（Power Platform Local User Group）</a> 発のプロジェクトです。</p>
+</footer>
+
+</body>
+</html>
