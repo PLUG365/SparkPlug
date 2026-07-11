@@ -62,7 +62,7 @@ export interface Poll {
   at: number;
 }
 
-/** コメントの流れ方。horizontal=右→左（ニコニコ的な横流れ）/ vertical=下→上に昇る。既定 horizontal */
+/** コメントの流れ方。horizontal=右→左（某動画配信サイトリスペクトの横流れ）/ vertical=下→上に昇る。既定 horizontal */
 export type CommentFlow = 'horizontal' | 'vertical';
 
 /** イベントごとのスクリーン設定。qrVisible=QRコード表示 / soundEnabled=効果音ミュート制御（共に既定 true）/ commentFlow=コメントの流れ方（既定 horizontal） */
