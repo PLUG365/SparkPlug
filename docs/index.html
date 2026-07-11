@@ -221,6 +221,22 @@
   }
   .band h2 .spark { color: var(--orange); }
 
+  /* デモ動画 */
+  .demo-section { padding-top: 72px; padding-bottom: 0; text-align: center; }
+  .demo-section .lead { margin-left: auto; margin-right: auto; }
+  .demo-frame {
+    margin: 40px auto 0;
+    max-width: 880px;
+    border-radius: var(--radius);
+    border: 1px solid #2a2a2e;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(208,52,44,.28), 0 6px 28px rgba(0,0,0,.5);
+    background: #000;
+    line-height: 0;
+  }
+  .demo-frame video { width: 100%; height: auto; }
+  .demo-note { margin-top: 14px; font-size: 12.5px; color: #6d6d75; }
+
   footer { padding: 44px 24px 56px; text-align: center; font-size: 12.5px; color: #6d6d75; }
   footer a { color: #9a9aa2; }
   footer .sep { margin: 0 10px; opacity: .4; }
@@ -271,6 +287,18 @@
     <p class="hero-note">Spark plug = 点火プラグ。エンジンをかける。場に火をつける。</p>
   </div>
 </header>
+
+<section class="demo-section">
+  <div class="wrap">
+    <span class="kicker">Live Demo</span>
+    <h2>実際の会場スクリーン、こんな感じ。</h2>
+    <p class="lead">本物のSparkPlugにデモ投稿を流し込んだ実録画。発表スライドを画面共有で背景に敷き、その上にコメント・リアクション・アンケートのライブ集計がリアルタイムに重なります。</p>
+    <div class="demo-frame">
+      <video src="assets/demo.mp4" poster="assets/demo-poster.jpg" autoplay muted loop playsinline></video>
+    </div>
+    <p class="demo-note">映像は開発サーバー上で <code style="color:var(--lime)">npm run demo:seed</code> を流し込んで自動録画したものです。</p>
+  </div>
+</section>
 
 <section>
   <div class="wrap">
