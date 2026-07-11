@@ -72,13 +72,15 @@ function fireAsciiArt(audiences) {
 
 /** アンケートを新規作成→開始→投票を少しずつ流し込み→締切、まで一気通貫でやる */
 async function firePoll(host) {
-  const question = `デモ用アンケート ${Date.now()}`;
+  // 質問文は録画にそのまま映るので一意化サフィックスは付けない。
+  // 代わりに「同名の下書きのうち最後（＝いま作った最新）」を選んで特定する
+  const question = '今日のデモ、盛り上がってる？';
   const pollId = await new Promise((resolve) => {
     const onPolls = (list) => {
-      const draft = list.find((p) => p.status === 'draft' && p.question === question);
-      if (draft) {
+      const drafts = list.filter((p) => p.status === 'draft' && p.question === question);
+      if (drafts.length > 0) {
         host.off('polls', onPolls);
-        resolve(draft.id);
+        resolve(drafts[drafts.length - 1].id);
       }
     };
     host.on('polls', onPolls);
