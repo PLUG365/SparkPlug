@@ -45,7 +45,7 @@ flowchart TD
 
 ```
 apps/
-  web/       React + Vite SPA（host / presenter / audience / screen の4ビュー）
+  web/       React + Vite SPA（host / presenter / audience / screen / overlay の5ビュー）
   server/    Express + Socket.IO リアルタイムサーバー
 packages/
   shared/    クライアント/サーバー共有の Socket.IO イベント型定義
@@ -67,7 +67,7 @@ npm run dev:web        # http://localhost:5173
 
 ※ 初回は `npm run build` で `packages/shared` をビルドしてから dev を起動すること。
 
-### 動作確認（4つのビュー）
+### 動作確認（5つのビュー）
 
 イベントID（`demo`など好きな文字列）ごとに以下のURLを開く:
 
@@ -77,8 +77,11 @@ npm run dev:web        # http://localhost:5173
 | 発表者 | `/e/{eventId}/presenter?t=<token>` （要権限トークン） |
 | 参加者 | `/e/{eventId}` |
 | 会場スクリーン | `/e/{eventId}/screen` |
+| OBSオーバーレイ | `/e/{eventId}/overlay` |
 
 会場スクリーンの画面共有機能（Screen Capture API）はセキュアコンテキスト（`localhost` / `https`）でのみ動くため、**必ず `localhost` 経由で開く**こと。
+
+オーバーレイビューは OBS 等の配信ソフト連携用（Browser Source に `/e/{eventId}/overlay` を追加すると、会場スクリーンのQR・操作ボタン・背景共有映像を除いた、透明背景で演出だけが重なる）。Teamsハイブリッドの基本構成では OBS は不要（会場スクリーンの背景キャプチャで足りる）。使い分けは [主催者マニュアル](docs/主催者マニュアル.md) の 4-1 を参照。レイヤーはURLクエリで絞れる（例: `/e/{eventId}/overlay?comments=0&questions=0&poll=0&se=0` はリアクションのみ）。
 
 ### ホスト/発表者リンク（権限トークン）
 
