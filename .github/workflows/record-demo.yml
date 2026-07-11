@@ -2,9 +2,18 @@ name: Record Demo Video
 
 # 実アプリ（server + built web）を起動して demo-seed を流し込みながら
 # 会場スクリーンを Playwright で録画し、mp4 とポスター画像を
-# 実行元ブランチにコミットする。手動実行専用。
+# 実行元ブランチにコミットする。
+# workflow_dispatch はデフォルトブランチに取り込まれてから使えるようになるため、
+# 開発中は claude/** ブランチへの録画関連ファイルの push でも起動する。
+# （録画結果のコミットは docs/assets のみ変更 = paths 対象外なのでループしない）
 on:
   workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - scripts/record-demo.mjs
+      - scripts/demo-seed.mjs
+      - .github/workflows/record-demo.yml
 
 permissions:
   contents: write
