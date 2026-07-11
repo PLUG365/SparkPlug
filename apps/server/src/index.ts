@@ -27,6 +27,17 @@ const CORS_ORIGIN: string | boolean = process.env.CORS_ORIGIN ?? true;
 const DEFAULT_HOST_SECRET = 'sparkplug-dev-secret';
 const HOST_SECRET = process.env.HOST_SECRET ?? DEFAULT_HOST_SECRET;
 const HOST_SECRET_IS_DEFAULT = HOST_SECRET === DEFAULT_HOST_SECRET;
+
+// 本番（NODE_ENV=production）で既定値のまま起動しようとしたら即座に落とす。
+// リポジトリが公開されている以上、既定値は誰でも読めるため「未設定に気づかない」猶予がない。
+if (HOST_SECRET_IS_DEFAULT && process.env.NODE_ENV === 'production') {
+  console.error(
+    '[security] HOST_SECRET が未設定のまま本番起動しようとしました。' +
+      '既定値はソースに公開されており host/presenter トークンが推測可能なため、起動を中止します。',
+  );
+  process.exit(1);
+}
+
 const PRIVILEGED_ROLES: ReadonlySet<Role> = new Set<Role>(['host', 'presenter']);
 
 /** eventId に対する特権ロール用トークンを導出する（サーバー秘密鍵に依存、決定的） */
