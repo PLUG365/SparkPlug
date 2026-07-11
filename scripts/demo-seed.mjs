@@ -21,14 +21,29 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function connect(role) {
-  return new Promise((resolve) => {
+function connect(role, token) {
+  return new Promise((resolve, reject) => {
     const socket = io(serverUrl);
     socket.on('connect', () => {
-      socket.emit('join', { eventId, role });
+      socket.emit('join', { eventId, role, token });
       resolve(socket);
     });
+    socket.on('authRejected', () => {
+      reject(new Error(`join rejected: role=${role}（トークン不一致）`));
+    });
   });
+}
+
+// host ロールは権限トークン必須。開発用エンドポイント（HOST_SECRET 未設定時のみ有効）から取得する。
+// HOST_SECRET 設定済みのサーバーに対しては DEMO_HOST_TOKEN 環境変数で直接渡す。
+async function fetchHostToken() {
+  if (process.env.DEMO_HOST_TOKEN) return process.env.DEMO_HOST_TOKEN;
+  const res = await fetch(`${serverUrl}/events/${eventId}/host-link`);
+  if (!res.ok) {
+    throw new Error(`host トークンを取得できません（HTTP ${res.status}）。HOST_SECRET 設定済みの場合は DEMO_HOST_TOKEN を指定してください。`);
+  }
+  const { token } = await res.json();
+  return token;
 }
 
 /** リアクションを100msごとに2発、25回（計50発）まとめて撃つ */
@@ -87,7 +102,7 @@ async function firePoll(host) {
 async function main() {
   console.log(`[demo-seed] event=${eventId} server=${serverUrl}`);
   const audiences = await Promise.all([1, 2, 3, 4, 5].map(() => connect('audience')));
-  const host = await connect('host');
+  const host = await connect('host', await fetchHostToken());
   console.log('[demo-seed] 接続完了。リアクション + コメント + AA + アンケートを同時に流します…');
 
   await Promise.all([

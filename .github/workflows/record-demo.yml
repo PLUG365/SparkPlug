@@ -1,0 +1,54 @@
+name: Record Demo Video
+
+# 実アプリ（server + built web）を起動して demo-seed を流し込みながら
+# 会場スクリーンを Playwright で録画し、mp4 とポスター画像を
+# 実行元ブランチにコミットする。手動実行専用。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install Playwright Chromium + fonts
+        run: |
+          npm i --no-save playwright
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk fonts-noto-color-emoji
+      - name: Start server (single-origin, same as production)
+        run: |
+          WEB_DIST=$PWD/apps/web/dist PORT=3001 node apps/server/dist/index.js &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3001/health && break
+            sleep 1
+          done
+      - name: Record screen view
+        run: node scripts/record-demo.mjs demo
+      - name: Encode mp4 and poster
+        run: |
+          ffmpeg -y -i /tmp/demo-raw.webm -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p -movflags +faststart docs/assets/demo.mp4
+          ffmpeg -y -ss 7 -i docs/assets/demo.mp4 -frames:v 1 -q:v 3 docs/assets/demo-poster.jpg
+      - name: Commit video to this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/demo.mp4 docs/assets/demo-poster.jpg
+          git commit -m "デモ動画を自動録画で更新"
+          git push origin HEAD:"$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-video
+          path: |
+            docs/assets/demo.mp4
+            docs/assets/demo-poster.jpg
+            /tmp/demo-raw.webm
