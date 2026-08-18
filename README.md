@@ -30,7 +30,7 @@ flowchart TD
         App["apps/server：Express + Socket.IO<br/>・ビルド済み apps/web を同一オリジンで配信<br/>・リアルタイム通信（WebSocket）<br/>・イベント状態は in-memory（永続DBなし）"]
     end
 
-    ACR["Azure Container Registry"] -->|"az acr build → containerapp update"| App
+    GHCR["GitHub Container Registry（ghcr.io）"] -->|"docker build/push → containerapp update"| App
     GH["GitHub Actions：CI（build + typecheck）"]
 
     App -.->|"イベント終了時に手動でDL"| CSV["ログ CSV<br/>（唯一のセーブポイント）"]
@@ -39,7 +39,7 @@ flowchart TD
 
 > 当初は web=Static Web Apps / server=Container Apps の分離構成 + Cosmos DB を想定していたが、公開URL最速化のため **Express が web のビルド済み静的ファイルを同一オリジンで配信する単一コンテナ構成**に変更（CORS 不要）。永続化（Cosmos DB）も**見送り**（in-memory 運用＋終了時 CSV 回収）。AI 振り返りは**専用実装せず手動運用**（CSV を Claude/ChatGPT 等に投げる）。
 
-コスト方針: 単一コンテナを Azure Container Apps に scale-to-zero で配置。無アクセス時のコンテナ実行は ¥0、定常コストは Azure Container Registry（Basic）約 $5/月のみ。イベント当日は min replica 1 に上げて数十〜数百円/日。
+コスト方針: 単一コンテナを Azure Container Apps に scale-to-zero で配置。無アクセス時のコンテナ実行は ¥0。イメージは GitHub Container Registry（ghcr.io、private + 限定スコープ PAT で pull）を使い、Azure Container Registry の固定費（Basic 約 $5/月）は発生しない。イベント当日は min replica 1 に上げて数十〜数百円/日。
 
 ## リポジトリ構成
 
@@ -127,8 +127,9 @@ npm run demo:seed -- <eventId>   # 例: npm run demo:seed -- demo
 - [x] AAコメント対応（某動画配信サイトリスペクトの複数行アスキーアート、等幅・改行保持でゆっくり流す）
 - [x] SE 再生（ドン/カッ/拍手。フリー素材 mp3 + Web Audio API 合成フォールバック）
 - [x] 選択式アンケート + リアルタイム集計（ホスト作成/締切、投票し直し可、スクリーンにライブ表示）
-- [x] Dockerfile + Azure Container Apps に単一コンテナでデプロイ（検証環境。本番 PAYG は実イベント時に再デプロイ）
-- [ ] ~~Azure Static Web Apps 分離デプロイ + GitHub Actions CD~~ → **見送り**（Express が web を同一オリジン配信する単一コンテナ構成を採用。現状デプロイは `az acr build` → `containerapp update` の手動）
+- [x] Dockerfile + Azure Container Apps に単一コンテナでデプロイ（検証環境 = VS Enterpriseサブスク）
+- [x] 本番デプロイ（PAYGサブスク、ghcr.io起点、2026-08-18）
+- [ ] ~~Azure Static Web Apps 分離デプロイ + GitHub Actions CD~~ → **見送り**（Express が web を同一オリジン配信する単一コンテナ構成を採用。現状デプロイは `docker build/push`（ghcr.io） → `containerapp update` の手動）
 - [x] ログ CSV エクスポート（UTF-8 BOM、Excel対応。※in-memory運用のため**イベント終了時にDLすること**。再起動/スケールダウンで消える）
 - [ ] ~~イベントログ永続化（Cosmos DB）~~ → **見送り**（in-memory運用を継続。落ちても自動再起動＋クライアント自動再接続で復帰、失うのは溜めたログのみ。データはイベント終了時にCSVで都度回収する方針）
 - [x] 発表者ビュー: エモメーター（波形＋熱量＋バイブ）・質問（参加者が表示名付きで発表者に送る）
