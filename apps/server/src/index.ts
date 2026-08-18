@@ -221,6 +221,15 @@ function roleRoomOf(eventId: string, role: Role): string {
   return `event:${eventId}:role:${role}`;
 }
 
+/**
+ * 「参加中」表示の対象ロール。host / screen（会場スクリーン・Overlay兼用）は
+ * 運営側が開く表示用ウィンドウであり、開いた枚数ぶん参加者数が水増しされてしまうため除外する。
+ */
+async function attendingCount(eventId: string): Promise<number> {
+  const rooms = [roleRoomOf(eventId, 'audience'), roleRoomOf(eventId, 'presenter')];
+  return (await io.in(rooms).fetchSockets()).length;
+}
+
 // ── スクリーン設定ストア ────────────────────────────────────────
 /** スクリーン設定の既定値。QRコード表示・効果音とも初期は ON */
 const DEFAULT_EVENT_SETTINGS: EventSettings = { qrVisible: true, soundEnabled: true, commentFlow: 'horizontal' };
@@ -309,7 +318,7 @@ io.on('connection', (socket) => {
     await socket.join(roomOf(eventId));
     // ロール別ルームにも join（質問の宛先絞り込みに使う）
     await socket.join(roleRoomOf(eventId, role));
-    const count = (await io.in(roomOf(eventId)).fetchSockets()).length;
+    const count = await attendingCount(eventId);
     socket.emit('joined', { eventId, participantCount: count, name: events.get(eventId)?.name });
     io.to(roomOf(eventId)).emit('participantCount', count);
     // 実施中のアンケートがあれば本人にだけ現状を送る（全ロール共通）
@@ -559,7 +568,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', async () => {
     if (!joinedEventId) return;
-    const count = (await io.in(roomOf(joinedEventId)).fetchSockets()).length;
+    const count = await attendingCount(joinedEventId);
     io.to(roomOf(joinedEventId)).emit('participantCount', count);
   });
 });

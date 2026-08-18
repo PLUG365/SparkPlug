@@ -87,6 +87,8 @@ export default function Overlay() {
     questions: isEnabled(params, 'questions'),
     se: isEnabled(params, 'se'),
     poll: isEnabled(params, 'poll'),
+    qr: isEnabled(params, 'qr', false),
+    logo: isEnabled(params, 'logo'),
     debug: isEnabled(params, 'debug', false),
   }), [params]);
 
@@ -179,6 +181,15 @@ export default function Overlay() {
         @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-40vh); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
       `}</style>
+
+      {layers.logo && (
+        <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', fontSize: '1.1rem', color: BRAND.lime, display: 'flex', alignItems: 'center', gap: 10, whiteSpace: 'nowrap' }}>
+          <span>SparkPlug ⚡</span>
+          <span style={pillBadgeStyle(connected)}>
+            {connected ? `${participantCount}人が参加中` : '接続中…'}
+          </span>
+        </div>
+      )}
 
       {layers.debug && (
         <div style={{ position: 'absolute', left: 16, bottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -322,6 +333,21 @@ export default function Overlay() {
           <div style={{ fontSize: '1rem', color: BRAND.lime, marginTop: 6 }}>
             @{pinnedQuestion.displayName}
           </div>
+        </div>
+      )}
+
+      {layers.qr && (
+        <div
+          style={{
+            position: 'absolute', bottom: 20, right: 20,
+            background: '#fff', padding: 8, borderRadius: 8,
+          }}
+        >
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`${import.meta.env.VITE_AUDIENCE_URL}/e/${eventId}`)}`}
+            alt="参加用QRコード"
+            style={{ display: 'block', width: 120, height: 120 }}
+          />
         </div>
       )}
     </main>
