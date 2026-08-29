@@ -11,7 +11,7 @@ import {
   verifyPostconditions,
 } from './production-scale.mjs';
 
-const target = { subscription: 'subscription-id', resourceGroup: 'rg', name: 'sparkplug-prod' };
+const target = { subscription: '11111111-2222-3333-4444-555555555555', resourceGroup: 'example-prod-rg', name: 'example-app' };
 const event = policy.modes.event;
 const safeEventState = {
   minReplicas: 1,
@@ -26,7 +26,7 @@ const safeEventState = {
 };
 
 test('parses explicit event apply confirmations', () => {
-  const args = parseArgs(['--mode', 'event', '--apply', '--confirm-app', 'sparkplug-prod', '--confirm-data-loss']);
+  const args = parseArgs(['--mode', 'event', '--apply', '--confirm-app', 'example-app', '--confirm-data-loss']);
   assert.deepEqual(args.errors, []);
   assert.deepEqual(validateOperation(args, target), []);
 });
@@ -40,7 +40,7 @@ test('rejects apply without exact app and data-loss confirmations', () => {
 });
 
 test('rejects an unsupported mode and mutually exclusive operation flags', () => {
-  const args = parseArgs(['--mode', 'two-replicas', '--check', '--apply', '--confirm-app', 'sparkplug-prod', '--confirm-data-loss']);
+  const args = parseArgs(['--mode', 'two-replicas', '--check', '--apply', '--confirm-app', 'example-app', '--confirm-data-loss']);
   assert.deepEqual(validateOperation(args, target), [
     '--mode must be event or idle',
     '--apply and --check cannot be used together',
@@ -64,23 +64,23 @@ test('requires all local target environment values', () => {
 
 test('accepts the exact Azure target formats and rejects shell metacharacters', () => {
   assert.deepEqual(validateTarget({
-    subscription: '4b7a3fe9-3e74-4a12-aac9-74b190fd3418',
-    resourceGroup: 'sparkplug-prod-rg',
-    name: 'sparkplug-prod',
+    subscription: '11111111-2222-3333-4444-555555555555',
+    resourceGroup: 'example-prod-rg',
+    name: 'example-app',
   }), []);
   assert.deepEqual(validateTarget({
     subscription: 'Minoru-PAYG & whoami',
     resourceGroup: 'rg;whoami',
-    name: 'sparkplug-prod&whoami',
+    name: 'example-app&whoami',
   }), [
     'AZURE_SUBSCRIPTION_ID must be a subscription UUID, not a display name',
     'AZURE_RESOURCE_GROUP contains unsupported characters',
     'AZURE_CONTAINER_APP must be a valid lowercase Container Apps name',
   ]);
   assert.deepEqual(validateTarget({
-    subscription: '4b7a3fe9-3e74-4a12-aac9-74b190fd3418',
-    resourceGroup: 'sparkplug-prod-rg',
-    name: 'sparkplug--prod',
+    subscription: '11111111-2222-3333-4444-555555555555',
+    resourceGroup: 'example-prod-rg',
+    name: 'example--app',
   }), ['AZURE_CONTAINER_APP must not contain consecutive hyphens']);
 });
 
