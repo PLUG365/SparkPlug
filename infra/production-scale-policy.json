@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "invariants": {
+    "maxReplicas": 1,
+    "activeRevisionsMode": "Single"
+  },
+  "modes": {
+    "event": {
+      "minReplicas": 1,
+      "maxReplicas": 1
+    },
+    "idle": {
+      "minReplicas": 0,
+      "maxReplicas": 1
+    }
+  }
+}

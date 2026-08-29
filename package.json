@@ -13,7 +13,9 @@
     "dev:server": "npm run dev -w apps/server",
     "dev:web": "npm run dev -w apps/web",
     "demo:seed": "node scripts/demo-seed.mjs",
-    "host-link": "node scripts/host-link.mjs"
+    "host-link": "node scripts/host-link.mjs",
+    "production:scale": "node scripts/production-scale.mjs",
+    "test:production-scale": "node --test scripts/production-scale.test.mjs"
   },
   "devDependencies": {
     "socket.io-client": "^4.8.0"

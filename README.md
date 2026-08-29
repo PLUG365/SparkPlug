@@ -41,6 +41,31 @@ flowchart TD
 
 コスト方針: 単一コンテナを Azure Container Apps に scale-to-zero で配置。無アクセス時のコンテナ実行は ¥0。イメージは GitHub Container Registry（ghcr.io、private + 限定スコープ PAT で pull）を使い、Azure Container Registry の固定費（Basic 約 $5/月）は発生しない。イベント当日は min replica 1 に上げて数十〜数百円/日。
 
+### 本番のスケール運用（必須）
+
+SparkPlugのイベント状態とSocket.IOの接続情報は1台のメモリにしかありません。**本番は常に `maxReplicas=1`（かつ Single revision mode）でなければなりません**。複数レプリカは接続・投票・ログを分断します。
+
+開始30分前にevent mode（`min=1, max=1`）へ切り替え、終了後にCSVを回収してからidle mode（`min=0, max=1`）へ戻します。スケール変更や再起動によりメモリ上のイベント状態が消えるため、CSV回収前の変更はしません。
+
+対象はローカル環境変数でのみ指定します（値をリポジトリに保存しない）。PowerShellの例:
+
+```powershell
+$env:AZURE_SUBSCRIPTION_ID = '<subscription-id>'
+$env:AZURE_RESOURCE_GROUP = '<resource-group>'
+$env:AZURE_CONTAINER_APP = '<container-app-name>'
+
+# 読み取り専用の確認（不一致時は終了コード1）
+npm run production:scale -- --mode event --check
+
+# 開始30分前: 正確なapp名とデータ消失の確認を明示して適用
+npm run production:scale -- --mode event --apply --confirm-app $env:AZURE_CONTAINER_APP --confirm-data-loss
+
+# 終了後、CSVを回収してからidleへ戻す
+npm run production:scale -- --mode idle --apply --confirm-app $env:AZURE_CONTAINER_APP --confirm-data-loss
+```
+
+CLIはAzureアカウントIDと指定subscriptionの一致を確認し、変更前後のmin/max・revision mode・イメージ・Ingress・コンテナ実行設定を検証します。`--check` と通常実行は読み取り専用です。更新がタイムアウトした場合も再試行せず、現在状態を取得して安全な状態になったかだけを判定します。
+
 ## リポジトリ構成
 
 ```
