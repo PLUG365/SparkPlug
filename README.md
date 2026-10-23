@@ -39,13 +39,18 @@ flowchart TD
 
 > 当初は web=Static Web Apps / server=Container Apps の分離構成 + Cosmos DB を想定していたが、公開URL最速化のため **Express が web のビルド済み静的ファイルを同一オリジンで配信する単一コンテナ構成**に変更（CORS 不要）。永続化（Cosmos DB）も**見送り**（in-memory 運用＋終了時 CSV 回収）。AI 振り返りは**専用実装せず手動運用**（CSV を Claude/ChatGPT 等に投げる）。
 
-コスト方針: 単一コンテナを Azure Container Apps に scale-to-zero で配置。無アクセス時のコンテナ実行は ¥0。イメージは GitHub Container Registry（ghcr.io、private + 限定スコープ PAT で pull）を使い、Azure Container Registry の固定費（Basic 約 $5/月）は発生しない。イベント当日は min replica 1 に上げて数十〜数百円/日。
+コスト方針: 単一コンテナを Azure Container Apps に scale-to-zero で配置。無アクセス時のコンテナ実行は ¥0。イメージは GitHub Container Registry（ghcr.io、private + 限定スコープ PAT で pull）を使い、Azure Container Registry の固定費（Basic 約 $5/月）は発生しない。基本は min replica 0 のまま運用し、接続があるあいだだけ課金される（0.25 vCPU / 0.5 GiB の1台が丸一日アイドルで約30円/日）。
 
-### 本番のスケール運用（必須）
+### 本番のスケール運用
 
 SparkPlugのイベント状態とSocket.IOの接続情報は1台のメモリにしかありません。**本番は常に `maxReplicas=1`（かつ Single revision mode）でなければなりません**。複数レプリカは接続・投票・ログを分断します。
 
-開始30分前にevent mode（`min=1, max=1`）へ切り替え、終了後にCSVを回収してからidle mode（`min=0, max=1`）へ戻します。スケール変更や再起動によりメモリ上のイベント状態が消えるため、CSV回収前の変更はしません。
+**基本は idle mode（`min=0, max=1`）のまま運用します。** 接続があれば自動で1台起動し、接続が無くなってから約5分（cooldown 300秒）で0台に戻ります。0台に戻るとメモリ上のイベント状態は消えます。
+
+- **ホストが接続しているあいだは0台に戻らない**ことを実測で確認した（2026-10-23、WebSocket 1本を13分間・無操作で保持し、レプリカは1のまま。接続が無い状態では約5〜6分で0台に戻った）。ただし確認は13分間・1回のみで、数時間のイベントで同じ動作になる保証はない。
+- したがって、**全員の接続が5分以上途切れると状態が消える。** ホストPCのスリープ、ネットワーク断、休憩中にすべてのタブを閉じる、などに注意する。ホストPCはスリープしない設定にしておく。
+- 長いイベントや休憩を挟むイベントなど、状態が消えると困る場合だけ event mode（`min=1, max=1`）を使う。開始30分前に切り替え、終了後にCSVを回収してから idle mode へ戻す。スケール変更や再起動によりメモリ上のイベント状態が消えるため、CSV回収前の変更はしない。event mode は戻し忘れると1日約30円かかり続ける。
+- **終了後は、ホスト・会場スクリーン・OBSオーバーレイなど SparkPlug を開いたタブをすべて閉じる。** 開いたままだと接続が続き、0台に戻らず課金が続く。
 
 対象はローカル環境変数でのみ指定します（値をリポジトリに保存しない）。PowerShellの例:
 
