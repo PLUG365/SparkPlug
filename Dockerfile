@@ -1,6 +1,6 @@
 # SparkPlug 単一コンテナ（web ビルド済み静的ファイルを server が同一オリジンで配信）
 # ---- build stage: shared → server → web をまとめてビルド ----
-FROM node:22.23.4-alpine AS build
+FROM node:26.12.0-alpine AS build
 WORKDIR /app
 # workspace の package.json を先に入れて依存インストール（ソース変更時のキャッシュを効かせる）
 COPY package.json package-lock.json ./
@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime stage: server を起動し web/dist を配信 ----
-FROM node:22.23.4-alpine AS runtime
+FROM node:26.12.0-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=3001 WEB_DIST=/app/apps/web/dist
 # 小規模なのでビルド済み node_modules をそのまま持ってくる（workspace シンボリックリンク維持のため確実）
