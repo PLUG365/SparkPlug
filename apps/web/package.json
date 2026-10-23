@@ -13,7 +13,7 @@
     "@sparkplug/shared": "*",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^6.28.0",
+    "react-router-dom": "^7.18.4",
     "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
