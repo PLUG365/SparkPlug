@@ -4,6 +4,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Major upgrades (React 19, react-router 7, TypeScript 7, ...) need planned
+    # migrations, so routine version updates stop at minor/patch.
+    # Security updates are not affected by this ignore rule.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
     groups:
       # Packages with exact peer requirements on each other must move in one PR.
       react:
@@ -28,8 +35,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Stay on the Node 22 line until a runtime migration is planned.
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
